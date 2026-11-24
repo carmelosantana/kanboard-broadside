@@ -6,9 +6,10 @@ use JsonRPC\Server;
 use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Core\Http\Request;
 use Kanboard\Core\Http\Response;
-use Kanboard\Plugin\AiConnector\Model\ProviderRegistry;
 use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
 use Kanboard\Plugin\Broadside\Controller\ArtifactController;
+use Kanboard\Plugin\Broadside\Model\AiConnectorRewriter;
+use Kanboard\Plugin\Broadside\Model\AiRewriter;
 use Kanboard\Plugin\Broadside\Model\Importer;
 use Kanboard\Plugin\Broadside\Model\Lint;
 use KanboardTests\units\Base;
@@ -33,10 +34,10 @@ class ImporterTest extends Base
 
     public function testConformingHtmlAndMarkdownSkipAi(): void
     {
-        $registry = $this->createMock(ProviderRegistry::class);
-        $registry->method('isReady')->willReturn(true);
-        $registry->expects($this->never())->method('structured');
-        $importer = new Importer($this->container, $registry);
+        $rewriter = $this->createMock(AiRewriter::class);
+        $rewriter->expects($this->never())->method('isReady');
+        $rewriter->expects($this->never())->method('structured');
+        $importer = new Importer($this->container, $rewriter);
 
         $html = $importer->import($this->project, $this->users['member'], 'Report', self::TOKEN_HTML, 'html', self::SOURCE);
         $this->assertFalse($html['rewritten']);
@@ -55,9 +56,9 @@ class ImporterTest extends Base
 
     public function testReadyProviderReceivesContractAndOriginalAndPublishesRewrite(): void
     {
-        $registry = $this->createMock(ProviderRegistry::class);
-        $registry->expects($this->once())->method('isReady')->willReturn(true);
-        $registry->expects($this->once())->method('structured')->willReturnCallback(
+        $rewriter = $this->createMock(AiRewriter::class);
+        $rewriter->expects($this->once())->method('isReady')->willReturn(true);
+        $rewriter->expects($this->once())->method('structured')->willReturnCallback(
             function (array $messages, string $schema): array {
                 $this->assertStringContainsString(file_get_contents(__DIR__.'/../CONTRACT.md'), implode("\n", array_column($messages, 'content')));
                 $this->assertSame(self::ORIGINAL_HTML, end($messages)['content']);
@@ -65,7 +66,7 @@ class ImporterTest extends Base
                 return ['html' => self::TOKEN_HTML];
             }
         );
-        $result = (new Importer($this->container, $registry))->import(
+        $result = (new Importer($this->container, $rewriter))->import(
             $this->project, $this->users['member'], 'Report', self::ORIGINAL_HTML, 'html', self::SOURCE
         );
 
@@ -78,10 +79,10 @@ class ImporterTest extends Base
 
     public function testUnreadyProviderPreservesBodyAndWarnings(): void
     {
-        $registry = $this->createMock(ProviderRegistry::class);
-        $registry->expects($this->once())->method('isReady')->willReturn(false);
-        $registry->expects($this->never())->method('structured');
-        $result = (new Importer($this->container, $registry))->import(
+        $rewriter = $this->createMock(AiRewriter::class);
+        $rewriter->expects($this->once())->method('isReady')->willReturn(false);
+        $rewriter->expects($this->never())->method('structured');
+        $result = (new Importer($this->container, $rewriter))->import(
             $this->project, $this->users['member'], 'Report', self::ORIGINAL_HTML
         );
 
@@ -94,11 +95,11 @@ class ImporterTest extends Base
     /** @dataProvider failedRewrites */
     public function testFailedRewritePublishesOriginalWithWarnings(callable $rewrite, string $message): void
     {
-        $registry = $this->createMock(ProviderRegistry::class);
-        $registry->expects($this->once())->method('isReady')->willReturn(true);
-        $registry->expects($this->once())->method('structured')->willReturnCallback($rewrite);
+        $rewriter = $this->createMock(AiRewriter::class);
+        $rewriter->expects($this->once())->method('isReady')->willReturn(true);
+        $rewriter->expects($this->once())->method('structured')->willReturnCallback($rewrite);
 
-        $result = (new Importer($this->container, $registry))->import(
+        $result = (new Importer($this->container, $rewriter))->import(
             $this->project, $this->users['member'], 'Report', self::ORIGINAL_HTML, 'html', self::SOURCE
         );
 
@@ -126,11 +127,14 @@ class ImporterTest extends Base
     {
         foreach (spl_autoload_functions() as $autoload) {
             if (is_array($autoload) && $autoload[0] instanceof ClassLoader) {
-                $autoload[0]->setPsr4('Kanboard\\Plugin\\AiConnector\\', []);
-                $autoload[0]->setPsr4('Kanboard\\Plugin\\', []);
+                foreach (array_keys($autoload[0]->getPrefixesPsr4()) as $prefix) {
+                    if (str_starts_with($prefix, 'Kanboard\\Plugin\\') && $prefix !== 'Kanboard\\Plugin\\Broadside\\') {
+                        $autoload[0]->setPsr4($prefix, []);
+                    }
+                }
             }
         }
-        $this->assertFalse(class_exists(ProviderRegistry::class));
+        $this->assertNull(AiConnectorRewriter::fromInstalledPlugin($this->container));
 
         $rpc = $this->container['api']->getProcedureHandler();
         $result = $rpc->executeProcedure('artifactImport', [

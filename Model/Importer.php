@@ -4,7 +4,6 @@ namespace Kanboard\Plugin\Broadside\Model;
 
 use InvalidArgumentException;
 use Kanboard\Core\Base;
-use Kanboard\Plugin\AiConnector\Model\ProviderRegistry;
 use Pimple\Container;
 use Throwable;
 
@@ -12,7 +11,7 @@ final class Importer extends Base
 {
     public const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
-    public function __construct(Container $container, private readonly ?ProviderRegistry $registry = null)
+    public function __construct(Container $container, private readonly ?AiRewriter $rewriter = null)
     {
         parent::__construct($container);
     }
@@ -36,9 +35,9 @@ final class Importer extends Base
         $warnings = $format === 'html' ? Lint::check($content) : [];
         $rewritten = false;
         $aiError = [];
-        if ($warnings !== [] && ($registry = $this->readyRegistry()) !== null) {
+        if ($warnings !== [] && ($rewriter = $this->readyRewriter()) !== null) {
             try {
-                $result = $registry->structured([
+                $result = $rewriter->structured([
                     [
                         'role' => 'system',
                         'content' => "Rewrite the supplied HTML to follow this contract. Preserve the page's content and purpose.\n\n"
@@ -67,14 +66,10 @@ final class Importer extends Base
         ]) + ['warnings' => $warnings, 'rewritten' => $rewritten] + $aiError;
     }
 
-    private function readyRegistry(): ?ProviderRegistry
+    private function readyRewriter(): ?AiRewriter
     {
-        if (PHP_VERSION_ID < 80400 || ! class_exists(ProviderRegistry::class)) {
-            return null;
-        }
+        $rewriter = $this->rewriter ?? AiConnectorRewriter::fromInstalledPlugin($this->container);
 
-        $registry = $this->registry ?? new ProviderRegistry($this->container);
-
-        return $registry->isReady() ? $registry : null;
+        return $rewriter?->isReady() ? $rewriter : null;
     }
 }
