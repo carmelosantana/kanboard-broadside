@@ -1,0 +1,38 @@
+.broadside-toolbar,
+.broadside-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.broadside-toolbar {
+    justify-content: space-between;
+    margin-block: 1rem;
+}
+
+#broadside-publishing {
+    margin-block: 1.5rem;
+}
+
+.broadside-versions {
+    margin-block: 1rem;
+}
+
+.broadside-versions summary {
+    cursor: pointer;
+}
+
+.broadside-versions [aria-current="page"] {
+    font-weight: bold;
+}
+
+.broadside-frame {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 75vh;
+    min-height: 20rem;
+    border: 1px solid var(--border, currentColor);
+    border-radius: var(--radius, 0.25rem);
+}
