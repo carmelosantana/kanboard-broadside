@@ -1,7 +1,32 @@
 const assert = require('node:assert/strict');
+const { execFile } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
+const { promisify } = require('node:util');
 const vm = require('node:vm');
+
+test('the rendered public bridge rejects submit and results calls as read-only', async () => {
+    const { stdout: html } = await promisify(execFile)('php', ['-r', String.raw`
+        namespace Pimple;
+        class Container {} // Rendering HTML does not use the container.
+
+        require $argv[1];
+        $renderer = new \Kanboard\Plugin\Broadside\Model\Renderer(new Container(), __DIR__);
+        echo $renderer->render('<p>Shared page</p>', 'html', readOnly: true);
+    `, require.resolve('../../Model/Renderer.php')]);
+    const bridge = html.match(/<script id="broadside-bridge">([\s\S]*?)<\/script>/);
+    assert.ok(bridge, 'expected a bridge script in the rendered HTML');
+
+    const window = {};
+    vm.runInNewContext(bridge[1], { window, Promise, Error });
+    assert.equal(window.broadside.readOnly, true);
+    await assert.rejects(window.broadside.submit('poll', { choice: 'a' }, { once: true }), {
+        name: 'Error', message: 'read-only link',
+    });
+    await assert.rejects(window.broadside.results('poll'), {
+        name: 'Error', message: 'read-only link',
+    });
+});
 
 test('frame bridge relays mouse and keyboard selections, including deselection', () => {
     const script = readFileSync(require.resolve('../../Assets/js/frame-bridge.js'), 'utf8');

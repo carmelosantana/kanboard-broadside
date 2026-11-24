@@ -56,6 +56,10 @@ the total number of submissions for the form, and `mine` indicates whether the
 viewer has ever submitted to it. Submissions and results are available to
 signed-in users with project access. Handle rejected promises in the page.
 
+On public share links, `broadside.readOnly === true`. Use this flag to disable
+form controls and hide results. Both `broadside.submit()` and `broadside.results()`
+return rejected promises with the error message `read-only link`.
+
 Over JSON-RPC, `artifactSubmissionList(artifact_id, form_key='', since_id=0, limit=100)`
 lists submissions in ascending ID order, with `since_id` as an exclusive cursor.
 Use the last returned ID to request the next page. The maximum page size is 500.

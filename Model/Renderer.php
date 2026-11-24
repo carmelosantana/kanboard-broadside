@@ -61,7 +61,14 @@ class Renderer
         $bridge = $document->createElement('script');
         $bridge->id = 'broadside-bridge';
         if ($readOnly) {
-            $bridge->textContent = 'window.broadside = Object.freeze({ readOnly: true, onTheme() { return () => {}; } });';
+            $bridge->textContent = <<<'JS'
+                window.broadside = Object.freeze({
+                    readOnly: true,
+                    submit: () => Promise.reject(new Error('read-only link')),
+                    results: () => Promise.reject(new Error('read-only link')),
+                    onTheme() { return () => {}; },
+                });
+                JS;
         } else {
             $bridge->setAttribute('data-nonce', bin2hex(random_bytes(16)));
             $bridge->textContent = file_get_contents(__DIR__.'/../Assets/js/frame-bridge.js');
