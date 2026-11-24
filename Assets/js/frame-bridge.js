@@ -66,6 +66,16 @@
     };
 
     if (window.parent !== window) {
+        const relaySelection = () => {
+            const selection = window.getSelection()?.toString().trim();
+            if (selection) {
+                const text = Array.from(selection).slice(0, 1000).join('');
+                send('broadside:selection', { text });
+            }
+        };
+
+        document.addEventListener('mouseup', relaySelection);
+        document.addEventListener('keyup', relaySelection);
         send('broadside:ready');
     }
 })();
