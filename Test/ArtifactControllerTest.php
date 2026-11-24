@@ -30,10 +30,33 @@ class ArtifactControllerTest extends Base
         $this->assertStringContainsString('href="/broadside/artifact/'.$id.'"', $html);
         $this->assertStringContainsString('Assets/css/viewer.css', $html);
         $this->assertStringNotContainsString('Assets/js/viewer.js', $html);
+        $this->assertStringNotContainsString('action=upload', $html);
 
         [, $filtered] = $this->visit('viewer', "broadside/project/{$this->project}", 'index', ['search' => 'cUrReNt']);
         $this->assertStringContainsString('Current &lt;plan&gt;', $filtered);
         $this->assertStringNotContainsString('Earlier report', $filtered);
+    }
+
+    public function testPublisherCanOpenTheUploadFormFromTheListToolbar(): void
+    {
+        $this->publish('Current report', 'html', 'member');
+        [$status, $html] = $this->visit('member', "broadside/project/{$this->project}", 'index');
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('Current report', $html);
+
+        $document = new DOMDocument();
+        $document->loadHTML($html, LIBXML_NOERROR);
+        $xpath = new DOMXPath($document);
+        $upload = $xpath->query('//div[@class="broadside-toolbar"]/form[@role="search"]/following-sibling::*[last()][self::a]')->item(0);
+        $this->assertInstanceOf(DOMElement::class, $upload);
+        $this->assertSame('Upload', trim($upload->textContent));
+
+        $url = $upload->getAttribute('href');
+        parse_str(parse_url($url, PHP_URL_QUERY) ?? '', $query);
+        [$formStatus, $form] = $this->visit('member', ltrim(parse_url($url, PHP_URL_PATH) ?? '', '/'), 'upload', $query);
+        $this->assertSame(200, $formStatus);
+        $this->assertStringContainsString('enctype="multipart/form-data"', $form);
+        $this->assertStringContainsString('name="artifact"', $form);
     }
 
     public function testEmptyProjectExplainsAgentPublishing(): void

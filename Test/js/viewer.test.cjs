@@ -62,6 +62,44 @@ test('viewer replies immediately to the first ready from its own iframe and rela
     });
 });
 
+test('viewer resizes only for finite heights from its own iframe with the negotiated nonce', () => {
+    const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
+    const nonce = 'frame-nonce';
+    const frameWindow = { postMessage() {} };
+    const frame = { contentWindow: frameWindow, dataset: {}, style: { height: '' } };
+    let listener;
+
+    vm.runInNewContext(script, {
+        document: {
+            documentElement: { classList: { contains: () => false } },
+            querySelector: () => frame,
+        },
+        window: { addEventListener: (type, callback) => { listener = callback; } },
+        MutationObserver: class { observe() {} },
+    });
+
+    function send(height, source = frameWindow, token = nonce) {
+        listener({ source, data: { type: 'broadside:height', nonce: token, height } });
+    }
+
+    send(1200);
+    assert.equal(frame.style.height, '');
+    listener({ source: frameWindow, data: { type: 'broadside:ready', nonce } });
+    send(1200, {});
+    send(1200, frameWindow, 'wrong');
+    send('1200');
+    send(Infinity);
+    send(NaN);
+    assert.equal(frame.style.height, '');
+
+    send(1200);
+    assert.equal(frame.style.height, '1200px');
+    send(300);
+    assert.equal(frame.style.height, '480px');
+    send(25000);
+    assert.equal(frame.style.height, '20000px');
+});
+
 test('viewer relays only its own iframe requests with the negotiated nonce', async () => {
     const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
     const messages = [];

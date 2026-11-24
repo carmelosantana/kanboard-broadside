@@ -38,20 +38,15 @@ class ArtifactController extends BaseController
             }
         }
 
-        $list = [
+        $this->renderProject('list', [
             'project' => $this->projectModel->getById($projectId),
             'title' => t('Artifacts'),
             'artifacts' => $artifacts,
             'hasArtifacts' => $hasArtifacts,
             'publishers' => $publishers,
             'search' => $search,
-        ];
-        if ($access->can($userId, $projectId, 'publish')) {
-            $this->renderProject('upload', $list + ['list' => $list]);
-            return;
-        }
-
-        $this->renderProject('list', $list);
+            'canPublish' => $access->can($userId, $projectId, 'publish'),
+        ]);
     }
 
     public function upload(): void

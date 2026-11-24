@@ -12,7 +12,12 @@
                placeholder="<?= t('Search artifact titles') ?>" value="<?= $this->text->e($search) ?>">
         <button type="submit" class="btn"><?= t('Search') ?></button>
     </form>
-    <a href="#broadside-publishing" class="btn btn-blue"><?= t('Publishing instructions') ?></a>
+    <a href="#broadside-publishing" class="btn<?= $canPublish ? '' : ' btn-blue' ?>"><?= t('Publishing instructions') ?></a>
+    <?php if ($canPublish): ?>
+        <?= $this->url->link(t('Upload'), 'ArtifactController', 'upload', [
+            'plugin' => 'Broadside', 'project_id' => $project['id'],
+        ], false, 'btn btn-blue') ?>
+    <?php endif ?>
 </div>
 
 <?php if (! $hasArtifacts): ?>

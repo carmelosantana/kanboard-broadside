@@ -66,6 +66,13 @@
     };
 
     if (window.parent !== window) {
+        const root = document.documentElement;
+        const relayHeight = () => {
+            // The root's scrollHeight includes the viewport, even after the content shrinks.
+            const overflowHeight = root.scrollHeight > root.clientHeight ? root.scrollHeight : 0;
+            const height = Math.max(root.offsetHeight, document.body?.scrollHeight ?? 0, overflowHeight);
+            send('broadside:height', { height });
+        };
         const relaySelection = () => {
             const selection = window.getSelection()?.toString().trim();
             if (selection) {
@@ -76,6 +83,8 @@
 
         document.addEventListener('mouseup', relaySelection);
         document.addEventListener('keyup', relaySelection);
+        window.addEventListener('load', relayHeight);
+        new ResizeObserver(relayHeight).observe(root);
         send('broadside:ready');
     }
 })();

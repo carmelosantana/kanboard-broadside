@@ -72,6 +72,10 @@
             if (event.source !== frame.contentWindow || message?.nonce !== nonce) {
                 return;
             }
+            if (message.type === 'broadside:height' && Number.isFinite(message.height)) {
+                const height = Math.min(20000, Math.max(480, message.height));
+                frame.style.height = height + 'px';
+            }
             if (message.type === 'broadside:selection' && typeof message.text === 'string') {
                 relaySelection(message.text);
             }

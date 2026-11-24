@@ -27,6 +27,11 @@ class TemplatesTest extends Base
                 if ($user === 'viewer') {
                     $this->assertStringContainsString('Artifacts', $html, $name);
                     $this->assertStringContainsString('href="broadside/project/'.$this->project.'"', $html, $name);
+                    if ($name === 'template:project:sidebar') {
+                        $this->assertStringNotContainsString('<i class="fa', $html, $name);
+                    } else {
+                        $this->assertStringContainsString('<i class="fa', $html, $name);
+                    }
                 } else {
                     $this->assertSame('', $html, $name);
                 }

@@ -23,9 +23,11 @@ class Plugin extends Base
 
         $access = new Access($this->container);
         $canView = fn (int $projectId): bool => $access->can((int) $this->userSession->getId(), $projectId, 'view');
-        $menu = fn (array $project): array => ['canViewArtifacts' => $canView((int) $project['id'])];
         foreach (['template:project:dropdown', 'template:project-header:view-switcher', 'template:project:sidebar'] as $hook) {
-            $this->helper->hook->attachCallable($hook, 'Broadside:project/menu_item', $menu);
+            $this->helper->hook->attachCallable($hook, 'Broadside:project/menu_item', fn (array $project): array => [
+                'canViewArtifacts' => $canView((int) $project['id']),
+                'showIcon' => $hook !== 'template:project:sidebar',
+            ]);
         }
 
         $this->helper->hook->attachCallable('template:task:sidebar:information', 'Broadside:task/sidebar',
