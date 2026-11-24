@@ -1,6 +1,7 @@
 <?php
 
 use JsonRPC\Exception\AccessDeniedException;
+use JsonRPC\Request\RequestParser;
 use JsonRPC\Response\ResponseBuilder;
 use JsonRPC\Server;
 use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
@@ -71,7 +72,7 @@ class ProcedureTest extends Base
         $published = $this->publishReport();
         $id = $published['artifact_id'];
         $updated = $this->procedure->artifactPublish(
-            $this->project, 'Updated report', '## Second', 'markdown', $id, 0, 'https://source.example.test/'
+            $this->project, 'Updated report', '<h2>Second</h2>', 'html', $id, 0, 'https://source.example.test/'
         );
         $this->assertSame($id, $updated['artifact_id']);
         $this->assertSame(2, $updated['version']);
@@ -81,12 +82,12 @@ class ProcedureTest extends Base
         $this->assertSame($id, $current['artifact_id']);
         $this->assertSame($this->project, $current['project_id']);
         $this->assertSame('Updated report', $current['title']);
-        $this->assertSame('markdown', $current['type']);
+        $this->assertSame('html', $current['type']);
         $this->assertSame('https://source.example.test/', $current['source_url']);
         $this->assertSame($this->users['member'], $current['creator_id']);
         $this->assertSame(2, $current['current_version']);
         $this->assertSame(2, $current['version']);
-        $this->assertSame('## Second', $current['body']);
+        $this->assertSame('<h2>Second</h2>', $current['body']);
         $this->assertSame($updated['url'], $current['url']);
         $this->assertArrayNotHasKey('share_token', $current);
 
@@ -98,6 +99,34 @@ class ProcedureTest extends Base
         $this->loginAs('outsider');
         $this->assertNull($this->procedure->artifactGet($id));
         $this->assertForbidden(fn () => $this->procedure->artifactList($this->project));
+    }
+
+    public function testPublishRejectsTypeChangesWithAJsonRpcError(): void
+    {
+        $id = $this->publishReport()['artifact_id'];
+        $server = $this->container['api'];
+        $response = RequestParser::create()
+            ->withProcedureHandler($server->getProcedureHandler())
+            ->withMiddlewareHandler($server->getMiddlewareHandler())
+            ->withPayload([
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'artifactPublish',
+                'params' => [
+                    'project_id' => $this->project,
+                    'artifact_id' => $id,
+                    'title' => 'Updated report',
+                    'body' => '## Second',
+                    'type' => 'markdown',
+                ],
+            ])
+            ->parse();
+
+        $this->assertSame([
+            'code' => -32602,
+            'message' => 'Invalid params',
+            'data' => 'type cannot change; publish a new artifact',
+        ], json_decode($response, true)['error']);
     }
 
     public function testViewerListsArtifactSummaries(): void
