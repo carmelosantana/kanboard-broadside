@@ -2,8 +2,11 @@
 
 namespace Kanboard\Plugin\Broadside\Controller;
 
+use InvalidArgumentException;
 use Kanboard\Controller\BaseController;
+use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Plugin\Broadside\Model\Access;
+use Kanboard\Plugin\Broadside\Model\CommentModel;
 
 class ArtifactController extends BaseController
 {
@@ -45,8 +48,7 @@ class ArtifactController extends BaseController
     public function show(): void
     {
         $artifactId = $this->request->getIntegerParam('artifact_id');
-        $artifact = $this->db->table('broadside_artifacts')
-            ->eq('id', $artifactId)->eq('is_removed', 0)->findOne();
+        $artifact = $this->findArtifact($artifactId);
 
         if (empty($artifact) || ! (new Access($this->container))->can(
             (int) $this->userSession->getId(), (int) $artifact['project_id'], 'view'
@@ -76,7 +78,7 @@ class ArtifactController extends BaseController
             'theme' => $theme, 'preset' => $preset,
         ]);
 
-        $this->renderProject('show', [
+        $this->renderProject('comments', [
             'project' => $this->projectModel->getById($artifact['project_id']),
             'title' => $artifact['title'],
             'artifact' => $artifact,
@@ -86,7 +88,50 @@ class ArtifactController extends BaseController
             'theme' => $theme,
             'preset' => $preset,
             'csrf' => $this->token->getReusableCSRFToken(),
+            'comments' => (new CommentModel($this->container))->listByArtifact((int) $artifact['project_id'], $artifactId),
         ]);
+    }
+
+    public function comment(): void
+    {
+        if (! $this->request->isPost()) {
+            $this->response->status(405);
+            return;
+        }
+        $this->checkCSRFForm();
+
+        $artifactId = $this->request->getIntegerParam('artifact_id');
+        $artifact = $this->findArtifact($artifactId);
+        $userId = (int) $this->userSession->getId();
+        if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'comment')) {
+            throw new AccessForbiddenException();
+        }
+
+        $version = filter_var($this->request->getRawValue('version'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $parentId = filter_var($this->request->getRawValue('parent_id') ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if ($version === false || $parentId === false) {
+            $this->response->status(400);
+            return;
+        }
+
+        $comments = new CommentModel($this->container);
+        try {
+            $id = $comments->create(
+                $artifactId, $userId, $this->request->getRawValue('body'), $parentId,
+                $this->request->getRawValue('quote') ?? '', $version
+            );
+        } catch (InvalidArgumentException $e) {
+            $this->flash->failure($e->getMessage());
+            $this->response->redirect($comments->permalink($artifactId, (int) $artifact['current_version'], 'broadside-comments'));
+            return;
+        }
+
+        $this->response->redirect($comments->permalink($artifactId, $version, 'comment-'.$id));
+    }
+
+    private function findArtifact(int $artifactId): ?array
+    {
+        return $this->db->table('broadside_artifacts')->eq('id', $artifactId)->eq('is_removed', 0)->findOne();
     }
 
     private function renderProject(string $template, array $params): void

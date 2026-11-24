@@ -4,6 +4,22 @@
     const root = document.documentElement;
     let frame;
     let nonce;
+    let selection = '';
+
+    function relaySelection(text) {
+        const quote = document.querySelector('#broadside-comment-quote');
+        const button = document.querySelector('#broadside-quote-selection');
+        if (!quote || !button) {
+            return;
+        }
+
+        selection = text.trim();
+        button.hidden = selection === '';
+        button.onclick = () => {
+            quote.value = selection;
+            quote.focus();
+        };
+    }
 
     function relayTheme() {
         if (!frame) {
@@ -22,7 +38,15 @@
 
     window.addEventListener('message', (event) => {
         const message = event.data;
-        if (frame || message?.type !== 'broadside:ready' || typeof message.nonce !== 'string' || message.nonce === '') {
+        if (frame) {
+            if (event.source === frame.contentWindow && message?.nonce === nonce
+                && message.type === 'broadside:selection' && typeof message.text === 'string') {
+                relaySelection(message.text);
+            }
+            return;
+        }
+
+        if (message?.type !== 'broadside:ready' || typeof message.nonce !== 'string' || message.nonce === '') {
             return;
         }
 

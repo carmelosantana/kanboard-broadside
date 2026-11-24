@@ -6,6 +6,7 @@ use InvalidArgumentException;
 use JsonRPC\Exception\AccessDeniedException;
 use Kanboard\Core\Base;
 use Kanboard\Plugin\Broadside\Model\Access;
+use Kanboard\Plugin\Broadside\Model\CommentModel;
 use Pimple\Container;
 
 final class BroadsideProcedure
@@ -35,6 +36,16 @@ final class BroadsideProcedure
     public function artifactGetContract(): string
     {
         return $this->model->getContract();
+    }
+
+    public function artifactCommentList($project_id, $since_id = 0, $limit = 100, $artifact_id = 0): array
+    {
+        return $this->model->listComments($project_id, $since_id, $limit, $artifact_id);
+    }
+
+    public function artifactCommentCreate($artifact_id, $body, $parent_id = 0, $quote = ''): int
+    {
+        return $this->model->createComment($artifact_id, $body, $parent_id, $quote);
     }
 
     public function artifactRemove($artifact_id): bool
@@ -108,6 +119,49 @@ final class BroadsideProcedureModel extends Base
         $this->requireUser();
 
         return file_get_contents(__DIR__.'/../CONTRACT.md');
+    }
+
+    public function listComments(mixed $projectId, mixed $sinceId, mixed $limit, mixed $artifactId): array
+    {
+        $userId = $this->requireUser();
+        $projectId = $this->integerParam($projectId, 'project_id', 1);
+        if (! (new Access($this->container))->can($userId, $projectId, 'view')) {
+            throw new AccessDeniedException();
+        }
+
+        $sinceId = $this->integerParam($sinceId, 'since_id', 0);
+        $limit = $this->integerParam($limit, 'limit', 0);
+        $artifactId = $this->integerParam($artifactId, 'artifact_id', 0);
+        $comments = new CommentModel($this->container);
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'artifact_id' => (int) $row['artifact_id'],
+            'artifact_title' => $row['artifact_title'],
+            'url' => $comments->permalink((int) $row['artifact_id'], (int) $row['version'], 'comment-'.$row['id'], true),
+            'user_id' => (int) $row['user_id'],
+            'username' => $row['username'],
+            'body' => $row['body'],
+            'quote' => $row['quote'],
+            'parent_id' => $row['parent_id'] === null ? null : (int) $row['parent_id'],
+            'version' => (int) $row['version'],
+            'created_at' => (int) $row['created_at'],
+            'publisher_username' => $row['publisher_username'],
+        ], $comments->listByProject($projectId, $sinceId, $limit, $artifactId));
+    }
+
+    public function createComment(mixed $artifactId, mixed $body, mixed $parentId, mixed $quote): int
+    {
+        $userId = $this->requireUser();
+        $artifactId = $this->integerParam($artifactId, 'artifact_id', 1);
+        $artifact = $this->findArtifact($artifactId);
+        if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'comment')) {
+            throw new AccessDeniedException();
+        }
+
+        $parentId = $this->integerParam($parentId, 'parent_id', 0);
+
+        return (new CommentModel($this->container))->create($artifactId, $userId, $body, $parentId, $quote);
     }
 
     public function remove(mixed $artifactId): bool
