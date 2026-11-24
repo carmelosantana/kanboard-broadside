@@ -1,5 +1,6 @@
 <?php
 
+use Kanboard\Plugin\Broadside\Model\Renderer;
 use KanboardTests\units\Base;
 
 require_once __DIR__.'/BroadsideHarness.php';
@@ -76,6 +77,85 @@ class ArtifactModelTest extends Base
             'type' => 'pdf',
             'body' => 'Report',
         ]);
+    }
+
+    /** @dataProvider typeChanges */
+    public function testRejectsTypeChangesAndPreservesOriginalRendering(
+        string $type,
+        string $newType,
+        string $expectedMarkup,
+    ): void {
+        $model = $this->container['broadsideArtifactModel'];
+        $body = '<p id="original">First</p>';
+        $result = $model->publish($this->project, $this->users['member'], [
+            'title' => 'Report',
+            'type' => $type,
+            'body' => $body,
+        ]);
+        $id = $result['artifact_id'];
+
+        try {
+            $model->publish($this->project, $this->users['member'], [
+                'artifact_id' => $id,
+                'title' => 'Revised report',
+                'type' => $newType,
+                'body' => 'Second',
+            ]);
+            $this->fail('Republish accepted a type change.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertSame('type cannot change; publish a new artifact', $e->getMessage());
+        }
+
+        $artifact = $this->artifactRow($id);
+        $this->assertSame($type, $artifact['type']);
+        $this->assertSame(1, (int) $artifact['current_version']);
+        $this->assertNull($model->getVersion($id, 2));
+        $originalBody = $model->getVersion($id, 1);
+        $this->assertSame($body, $originalBody);
+        $html = (new Renderer($this->container))->render($originalBody, $artifact['type']);
+        $this->assertStringContainsString($expectedMarkup, $html);
+    }
+
+    public static function typeChanges(): array
+    {
+        return [
+            'HTML to Markdown' => ['html', 'markdown', '<p id="original">First</p>'],
+            'Markdown to HTML' => ['markdown', 'html', '&lt;p id="original"&gt;First&lt;/p&gt;'],
+        ];
+    }
+
+    /** @dataProvider invalidTitles */
+    public function testRejectsTitlesOutsideCharacterBounds(string $title): void
+    {
+        $model = $this->container['broadsideArtifactModel'];
+        $this->expectException(InvalidArgumentException::class);
+        $model->publish($this->project, $this->users['member'], [
+            'title' => $title,
+            'type' => 'html',
+            'body' => '<p>Report</p>',
+        ]);
+    }
+
+    public static function invalidTitles(): array
+    {
+        return [
+            'empty' => [''],
+            'whitespace only' => [" \t\n "],
+            '256 characters' => [str_repeat('é', 256)],
+        ];
+    }
+
+    public function testStoresTrimmedTitlesAtCharacterBounds(): void
+    {
+        $model = $this->container['broadsideArtifactModel'];
+        foreach (['é', str_repeat('é', 255)] as $title) {
+            $result = $model->publish($this->project, $this->users['member'], [
+                'title' => " \t".$title."\n ",
+                'type' => 'html',
+                'body' => '<p>Report</p>',
+            ]);
+            $this->assertSame($title, $this->artifactRow($result['artifact_id'])['title']);
+        }
     }
 
     public function testRejectsTaskFromAnotherProject(): void

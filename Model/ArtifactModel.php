@@ -30,6 +30,10 @@ class ArtifactModel extends Base
         if (! is_string($title)) {
             throw new InvalidArgumentException('Artifact title must be a string.');
         }
+        $title = trim($title);
+        if ($title === '' || mb_strlen($title, 'UTF-8') > 255) {
+            throw new InvalidArgumentException('Artifact title must contain 1 to 255 characters.');
+        }
         if ($taskId !== 0 && $this->taskFinderModel->getProjectId($taskId) !== $projectId) {
             throw new InvalidArgumentException('Artifact task must belong to the project.');
         }
@@ -51,11 +55,16 @@ class ArtifactModel extends Base
             } else {
                 // Increment under the write lock so concurrent publishes get different version numbers.
                 $update = $pdo->prepare('UPDATE broadside_artifacts
-                    SET current_version = current_version + 1, updated_at = ?, title = ?, type = ?,
+                    SET current_version = current_version + 1, updated_at = ?, title = ?,
                         task_id = COALESCE(?, task_id), source_url = COALESCE(?, source_url)
-                    WHERE id = ? AND project_id = ? AND is_removed = 0');
-                $update->execute([$now, $title, $type, $taskId, $sourceUrl, $artifactId, $projectId]);
+                    WHERE id = ? AND project_id = ? AND is_removed = 0 AND type = ?');
+                $update->execute([$now, $title, $taskId, $sourceUrl, $artifactId, $projectId, $type]);
                 if ($update->rowCount() !== 1) {
+                    $storedType = $this->db->table('broadside_artifacts')->eq('id', $artifactId)
+                        ->eq('project_id', $projectId)->eq('is_removed', 0)->findOneColumn('type');
+                    if ($storedType !== false && $storedType !== $type) {
+                        throw new InvalidArgumentException('type cannot change; publish a new artifact');
+                    }
                     throw new InvalidArgumentException('Artifact is unavailable in this project.');
                 }
 
