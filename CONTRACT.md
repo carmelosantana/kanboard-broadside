@@ -37,7 +37,10 @@ The base stylesheet supplies system typography, page padding, heading spacing,
 link styling, tables, inline code, scrollable code blocks, blockquotes, dividers,
 buttons, form controls and visible keyboard focus. Add `class="card"` for a
 padded, bordered surface or `class="bs-doc"` for a centred, readable measure.
-Markdown documents receive `.bs-doc` automatically.
+Markdown documents receive `.bs-doc` automatically. For `font-family`, lint
+accepts `inherit`, a `var(--font…)` token, or a comma-separated list of generic
+families such as `ui-monospace, monospace`. Named fonts such as `"JetBrains Mono"`
+or `Inter` trigger a lint warning when listed directly.
 
 ## Submissions and results
 

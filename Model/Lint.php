@@ -14,6 +14,17 @@ final class Lint
         )
         REGEX;
 
+    private const FONT_FAMILY = <<<'REGEX'
+        ~
+        ^ (?: inherit | var\(--font\) | (?&generic) (?: \s*,\s* (?&generic) )* )
+        \s* (?: !\s*important\s* )? $
+        (?(DEFINE)
+            (?<generic> monospace | ui-monospace | sans-serif | serif | system-ui | ui-sans-serif
+                | ui-serif | cursive | fantasy | math | emoji )
+        )
+        ~ixD
+        REGEX;
+
     public static function check(string $html): array
     {
         if ($html === '') {
@@ -69,8 +80,8 @@ final class Lint
             }, $value) ?? $value;
 
             if (strcasecmp($property, 'font-family') === 0
-                && ! preg_match('/^(?:inherit|var\(--font\))\s*(?:!\s*important\s*)?$/iD', $masked)) {
-                $warnings[] = 'Use inherit or a font token for font-family: '.trim($value);
+                && ! preg_match(self::FONT_FAMILY, $masked)) {
+                $warnings[] = 'Use inherit, a font token, or only generic families for font-family: '.trim($value);
             }
 
             $colour = <<<'REGEX'

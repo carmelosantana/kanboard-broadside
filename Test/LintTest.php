@@ -49,6 +49,34 @@ class LintTest extends Base
             HTML));
     }
 
+    public function testAllowsGenericFontFamilies(): void
+    {
+        $this->assertSame([], Lint::check(<<<'HTML'
+            <style>
+                code { font-family: monospace; }
+                pre { font-family: UI-MONOSPACE, monospace !important; }
+                p { font-family: system-ui, ui-sans-serif, sans-serif, ui-serif, serif; }
+                span { font-family: cursive, fantasy, math, emoji; }
+            </style>
+            HTML));
+    }
+
+    public function testWarnsAboutNamedFontsInFamilyLists(): void
+    {
+        $warnings = Lint::check(<<<'HTML'
+            <style>
+                code { font-family: "JetBrains Mono", monospace; }
+                p { font-family: system-ui, Inter, sans-serif; }
+                span { font-family: "monospace"; }
+            </style>
+            HTML);
+
+        $this->assertCount(3, $warnings);
+        foreach (['"JetBrains Mono", monospace', 'system-ui, Inter, sans-serif', '"monospace"'] as $value) {
+            $this->assertStringContainsString($value, implode("\n", $warnings));
+        }
+    }
+
     public function testAllowsGoogleFontsCssAndFlagsScriptOrLookalikeCdn(): void
     {
         $warnings = Lint::check(<<<'HTML'
