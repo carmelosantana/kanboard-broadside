@@ -8,6 +8,27 @@ class SchemaTest extends Base
 {
     use BroadsideHarness;
 
+    public function testShareTokensAreUniqueAndNullable(): void
+    {
+        $this->setUpBroadside();
+        $pdo = $this->container['db']->getConnection();
+        $now = time();
+        $insert = $pdo->prepare('INSERT INTO broadside_artifacts
+            (project_id, title, type, current_version, creator_id, created_at, updated_at, share_token)
+            VALUES (?, ?, ?, 1, ?, ?, ?, ?)');
+        $artifact = [$this->project, 'Report', 'markdown', $this->users['member'], $now, $now];
+
+        $insert->execute([...$artifact, null]);
+        $insert->execute([...$artifact, null]);
+        $this->assertSame(2, (int) $pdo->query('SELECT COUNT(*) FROM broadside_artifacts WHERE share_token IS NULL')->fetchColumn());
+
+        $token = str_repeat('a', 64);
+        $insert->execute([...$artifact, $token]);
+        $this->expectException(PDOException::class);
+        $this->expectExceptionCode(DB_DRIVER === 'postgres' ? '23505' : '23000');
+        $insert->execute([...$artifact, $token]);
+    }
+
     public function testVersionUniquenessAndProjectCascade(): void
     {
         $this->setUpBroadside();

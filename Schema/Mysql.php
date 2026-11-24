@@ -21,6 +21,7 @@ function version_1($pdo): void
         is_removed TINYINT NOT NULL DEFAULT 0,
         INDEX broadside_artifacts_project_idx (project_id),
         INDEX broadside_artifacts_task_idx (task_id),
+        UNIQUE INDEX broadside_artifacts_share_token_idx (share_token),
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
     ) ENGINE=InnoDB CHARSET=utf8mb4');

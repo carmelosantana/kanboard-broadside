@@ -22,6 +22,7 @@ function version_1($pdo): void
     )');
     $pdo->exec('CREATE INDEX IF NOT EXISTS broadside_artifacts_project_idx ON broadside_artifacts(project_id)');
     $pdo->exec('CREATE INDEX IF NOT EXISTS broadside_artifacts_task_idx ON broadside_artifacts(task_id)');
+    $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS broadside_artifacts_share_token_idx ON broadside_artifacts(share_token)');
 
     $pdo->exec('CREATE TABLE IF NOT EXISTS broadside_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
