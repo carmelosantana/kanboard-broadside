@@ -1,2 +1,4 @@
 .DS_Store
 .phpunit.result.cache
+Test/e2e/pagebot-pass
+Test/e2e/app-token
