@@ -22,7 +22,7 @@ Calls use a personal API token (Basic `username:token`), so everything is attrib
 - members publish;
 - managers remove and share.
 
-With [kanboard-mcp](https://github.com/carmelosantana/kanboard-mcp), the same thing is one tool, `artifact`, with `action` set to `publish`, `read`, `list`, `contract`, `import`, `comments`, `reply`, `submissions`, `share` or `remove`. `publish` takes a `file_path`.
+With the suite's kanboard-mcp server, the same thing is one tool, `artifact`, with `action` set to `publish`, `read`, `list`, `contract`, `import`, `comments`, `reply`, `submissions`, `share` or `remove`. `publish` takes a `file_path`.
 
 ## Security model
 
