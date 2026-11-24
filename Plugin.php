@@ -3,6 +3,7 @@
 namespace Kanboard\Plugin\Broadside;
 
 use Kanboard\Core\Plugin\Base;
+use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
 use Kanboard\Plugin\Broadside\Model\ArtifactModel;
 
 class Plugin extends Base
@@ -11,6 +12,9 @@ class Plugin extends Base
     {
         $this->container['broadsideArtifactModel'] = static fn ($container) => new ArtifactModel($container);
         $this->route->addRoute('broadside/raw/:artifact_id/:version', 'RawController', 'show', 'Broadside');
+        if (isset($this->container['api'])) {
+            $this->api->getProcedureHandler()->withObject(new BroadsideProcedure($this->container));
+        }
     }
 
     public function getPluginName(): string
