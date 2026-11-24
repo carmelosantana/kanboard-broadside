@@ -91,6 +91,33 @@ class ImporterTest extends Base
         $this->assertSame(self::ORIGINAL_HTML, (new BroadsideProcedure($this->container))->artifactGet($result['artifact_id'])['body']);
     }
 
+    /** @dataProvider failedRewrites */
+    public function testFailedRewritePublishesOriginalWithWarnings(callable $rewrite, string $message): void
+    {
+        $registry = $this->createMock(ProviderRegistry::class);
+        $registry->expects($this->once())->method('isReady')->willReturn(true);
+        $registry->expects($this->once())->method('structured')->willReturnCallback($rewrite);
+
+        $result = (new Importer($this->container, $registry))->import(
+            $this->project, $this->users['member'], 'Report', self::ORIGINAL_HTML, 'html', self::SOURCE
+        );
+
+        $this->assertFalse($result['rewritten']);
+        $this->assertSame(Lint::check(self::ORIGINAL_HTML), $result['warnings']);
+        $this->assertSame($message, $result['ai_error']);
+        $stored = (new BroadsideProcedure($this->container))->artifactGet($result['artifact_id']);
+        $this->assertSame(self::ORIGINAL_HTML, $stored['body']);
+        $this->assertSame(self::SOURCE, $stored['source_url']);
+    }
+
+    public static function failedRewrites(): array
+    {
+        return [
+            'provider throws' => [static fn () => throw new Error('Provider unavailable'), 'Provider unavailable'],
+            'invalid rewrite' => [static fn () => [], 'AI rewrite must return HTML of at most 5 MiB.'],
+        ];
+    }
+
     /**
      * @runInSeparateProcess
      * @preserveGlobalState disabled

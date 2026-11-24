@@ -6,6 +6,7 @@ use InvalidArgumentException;
 use Kanboard\Core\Base;
 use Kanboard\Plugin\AiConnector\Model\ProviderRegistry;
 use Pimple\Container;
+use Throwable;
 
 final class Importer extends Base
 {
@@ -34,21 +35,27 @@ final class Importer extends Base
 
         $warnings = $format === 'html' ? Lint::check($content) : [];
         $rewritten = false;
+        $aiError = [];
         if ($warnings !== [] && ($registry = $this->readyRegistry()) !== null) {
-            $result = $registry->structured([
-                [
-                    'role' => 'system',
-                    'content' => "Rewrite the supplied HTML to follow this contract. Preserve the page's content and purpose.\n\n"
-                        .file_get_contents(__DIR__.'/../CONTRACT.md'),
-                ],
-                ['role' => 'user', 'content' => $content],
-            ], '{"type":"object","properties":{"html":{"type":"string"}},"required":["html"],"additionalProperties":false}');
-            $content = $result['html'] ?? null;
-            if (! is_string($content) || strlen($content) > self::MAX_CONTENT_BYTES) {
-                throw new InvalidArgumentException('AI rewrite must return HTML of at most 5 MiB.');
+            try {
+                $result = $registry->structured([
+                    [
+                        'role' => 'system',
+                        'content' => "Rewrite the supplied HTML to follow this contract. Preserve the page's content and purpose.\n\n"
+                            .file_get_contents(__DIR__.'/../CONTRACT.md'),
+                    ],
+                    ['role' => 'user', 'content' => $content],
+                ], '{"type":"object","properties":{"html":{"type":"string"}},"required":["html"],"additionalProperties":false}');
+                $html = $result['html'] ?? null;
+                if (! is_string($html) || strlen($html) > self::MAX_CONTENT_BYTES) {
+                    throw new InvalidArgumentException('AI rewrite must return HTML of at most 5 MiB.');
+                }
+                $warnings = Lint::check($html);
+                $content = $html;
+                $rewritten = true;
+            } catch (Throwable $e) {
+                $aiError = ['ai_error' => $e->getMessage()];
             }
-            $warnings = Lint::check($content);
-            $rewritten = true;
         }
 
         return $this->container['broadsideArtifactModel']->publish($projectId, $userId, [
@@ -57,7 +64,7 @@ final class Importer extends Base
             'type' => $format,
             'source_url' => $sourceUrl,
             'artifact_id' => $artifactId,
-        ]) + ['warnings' => $warnings, 'rewritten' => $rewritten];
+        ]) + ['warnings' => $warnings, 'rewritten' => $rewritten] + $aiError;
     }
 
     private function readyRegistry(): ?ProviderRegistry
