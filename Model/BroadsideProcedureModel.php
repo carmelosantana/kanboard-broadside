@@ -132,7 +132,7 @@ final class BroadsideProcedureModel extends Base
         return (new CommentModel($this->container))->create($artifactId, $userId, $body, $parentId, $quote);
     }
 
-    public function listSubmissions(mixed $artifactId, mixed $formKey, mixed $sinceId): array
+    public function listSubmissions(mixed $artifactId, mixed $formKey, mixed $sinceId, mixed $limit): array
     {
         $userId = $this->requireUser();
         $artifactId = $this->integerParam($artifactId, 'artifact_id', 1);
@@ -142,8 +142,9 @@ final class BroadsideProcedureModel extends Base
         }
 
         $sinceId = $this->integerParam($sinceId, 'since_id', 0);
+        $limit = $this->integerParam($limit, 'limit', PHP_INT_MIN);
 
-        return (new SubmissionModel($this->container))->listByArtifact($artifactId, $formKey, $sinceId);
+        return (new SubmissionModel($this->container))->listByArtifact($artifactId, $formKey, $sinceId, $limit);
     }
 
     public function remove(mixed $artifactId): bool

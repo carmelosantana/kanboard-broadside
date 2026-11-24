@@ -14,6 +14,9 @@ use Throwable;
 /** Submission storage. Callers authorize user actions through Access. */
 class SubmissionModel extends Base
 {
+    public const DEFAULT_LIMIT = 100;
+
+    private const MAX_LIMIT = 500;
     private const MAX_PAYLOAD_BYTES = 64 * 1024;
 
     public function create(int $artifactId, int $userId, mixed $version, mixed $formKey, mixed $payload, bool $once): int
@@ -72,18 +75,33 @@ class SubmissionModel extends Base
     public function results(int $artifactId, int $userId, mixed $formKey): array
     {
         $formKey = $this->validateFormKey($formKey);
-        $rows = [];
-        $mine = false;
-        foreach ($this->listByArtifact($artifactId, $formKey) as $row) {
-            $mine = $mine || $row['user_id'] === $userId;
-            $rows[] = ['username' => $row['username'], 'data' => $row['data'], 'created_at' => $row['created_at']];
-        }
+        $sql = 'SELECT u.username, s.payload, s.created_at, totals.submission_count, totals.mine
+                FROM broadside_submissions s
+                JOIN broadside_artifacts a ON a.id = s.artifact_id
+                LEFT JOIN users u ON u.id = s.user_id
+                CROSS JOIN (
+                    SELECT COUNT(*) AS submission_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS mine
+                    FROM broadside_submissions WHERE artifact_id = ? AND form_key = ?
+                ) totals
+                WHERE s.artifact_id = ? AND s.form_key = ? AND a.is_removed = 0
+                ORDER BY s.id DESC LIMIT '.self::MAX_LIMIT;
+        $rows = $this->db->execute($sql, [$userId, $artifactId, $formKey, $artifactId, $formKey])->fetchAll(PDO::FETCH_ASSOC);
 
-        return ['form_key' => $formKey, 'count' => count($rows), 'rows' => $rows, 'mine' => $mine];
+        return [
+            'form_key' => $formKey,
+            'count' => (int) ($rows[0]['submission_count'] ?? 0),
+            'rows' => array_map(static fn (array $row): array => [
+                'username' => $row['username'],
+                'data' => json_decode($row['payload']),
+                'created_at' => (int) $row['created_at'],
+            ], $rows),
+            'mine' => (bool) ($rows[0]['mine'] ?? false),
+        ];
     }
 
-    public function listByArtifact(int $artifactId, mixed $formKey = '', int $sinceId = 0): array
+    public function listByArtifact(int $artifactId, mixed $formKey = '', int $sinceId = 0, int $limit = self::DEFAULT_LIMIT): array
     {
+        $limit = $limit <= 0 ? self::DEFAULT_LIMIT : min($limit, self::MAX_LIMIT);
         $sql = 'SELECT s.*, u.username FROM broadside_submissions s
                 JOIN broadside_artifacts a ON a.id = s.artifact_id
                 LEFT JOIN users u ON u.id = s.user_id
@@ -103,7 +121,7 @@ class SubmissionModel extends Base
             'username' => $row['username'],
             'data' => json_decode($row['payload']),
             'created_at' => (int) $row['created_at'],
-        ], $this->db->execute($sql.' ORDER BY s.id ASC', $params)->fetchAll(PDO::FETCH_ASSOC));
+        ], $this->db->execute($sql.' ORDER BY s.id ASC LIMIT '.$limit, $params)->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function validateFormKey(mixed $formKey): string

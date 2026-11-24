@@ -69,6 +69,33 @@ class SubmissionTest extends Base
         }
     }
 
+    public function testSubmissionListLimitsPagesInAscendingIdOrder(): void
+    {
+        $ids = [];
+        for ($i = 0; $i < 505; $i++) {
+            $ids[] = $this->seed('poll', '{}');
+        }
+        $_SESSION['user'] = $this->container['userModel']->getById($this->users['viewer']);
+        $handler = $this->container['api']->getProcedureHandler();
+        $params = ['artifact_id' => $this->artifactId, 'form_key' => 'poll'];
+
+        $first = $handler->executeProcedure('artifactSubmissionList', $params);
+        $this->assertCount(100, $first);
+        $this->assertSame(array_slice($ids, 0, 100), array_column($first, 'id'));
+        foreach ([0, -1] as $limit) {
+            $page = $handler->executeProcedure('artifactSubmissionList', $params + ['limit' => $limit]);
+            $this->assertSame(array_slice($ids, 0, 100), array_column($page, 'id'));
+        }
+
+        $page = $handler->executeProcedure('artifactSubmissionList', $params + ['limit' => 600]);
+        $this->assertSame(array_slice($ids, 0, 500), array_column($page, 'id'));
+        $cursor = end($page)['id'];
+        $next = $handler->executeProcedure('artifactSubmissionList', $params + ['since_id' => $cursor, 'limit' => 3]);
+        $this->assertSame(array_slice($ids, 500, 3), array_column($next, 'id'));
+        $last = $handler->executeProcedure('artifactSubmissionList', $params + ['since_id' => end($next)['id'], 'limit' => 3]);
+        $this->assertSame(array_slice($ids, 503), array_column($last, 'id'));
+    }
+
     private function seed(string $form, string $payload, ?int $artifactId = null): int
     {
         $db = $this->container['db'];

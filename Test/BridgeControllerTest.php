@@ -70,6 +70,26 @@ class BridgeControllerTest extends Base
         $this->assertSame(201, $this->submit('viewer')[0]);
     }
 
+    public function testResultsKeepTheNewestFiveHundredRowsAndReportTheFullCountAndMine(): void
+    {
+        $table = $this->container['db']->table('broadside_submissions');
+        $submission = ['artifact_id' => $this->artifactId, 'version' => 1, 'form_key' => 'poll', 'created_at' => 123];
+        for ($i = 0; $i <= 501; $i++) {
+            $table->insert($submission + [
+                'user_id' => $this->users[$i === 0 ? 'viewer' : 'member'],
+                'payload' => json_encode(['vote' => $i]),
+            ]);
+        }
+        $table->insert(['form_key' => 'feedback'] + $submission + ['user_id' => $this->users['viewer'], 'payload' => '{}']);
+
+        [$status, $results] = $this->callBridge('results', 'viewer', 'GET', ['form_key' => 'poll']);
+        $this->assertSame(200, $status);
+        $this->assertSame(502, $results['count']);
+        $this->assertCount(500, $results['rows']);
+        $this->assertSame(range(501, 2), array_map(static fn ($row) => $row->data->vote, $results['rows']));
+        $this->assertTrue($results['mine']);
+    }
+
     public function testOutsiderAndWrongMethodsCannotSubmit(): void
     {
         $this->assertSame(404, $this->submit('outsider')[0]);
@@ -102,9 +122,9 @@ class BridgeControllerTest extends Base
     public function testAcceptsAnEmptyObjectAndExactlySixtyFourKibibytes(): void
     {
         $this->assertSame(201, $this->submit('viewer', ['payload' => '{}'])[0]);
-        $this->assertSame(201, $this->submit('viewer', ['payload' => '{"x":"'.str_repeat('a', 65528).'"}'])[0]);
+        $this->assertSame(201, $this->submit('viewer', ['form_key' => 'large', 'payload' => '{"x":"'.str_repeat('a', 65528).'"}'])[0]);
         [, $results] = $this->callBridge('results', 'viewer', 'GET', ['form_key' => 'poll']);
-        $this->assertInstanceOf(stdClass::class, $results['rows'][0]->data);
+        $this->assertSame('{}', json_encode($results['rows'][0]->data));
     }
 
     private function submit(string $user, array $post = []): array

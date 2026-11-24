@@ -42,17 +42,26 @@ Markdown documents receive `.bs-doc` automatically.
 ## Submissions and results
 
 In the signed-in viewer, `broadside.submit(formKey, data, opts)` returns a promise
-for `{id}` and records a submission under the viewer's identity. Use
-`{once: true}` in `opts` for one submission per viewer and form. Form keys use
-1–64 lowercase ASCII letters, digits, underscores or hyphens. Send a JSON object
-of up to 64 KiB as `data`.
+for `{id}` and records a submission under the viewer's identity. Broadside
+enforces `{once: true}` per request. A request with this option is rejected if
+the viewer already submitted to that form on the artifact. Requests that omit
+the option can still create multiple rows, so count distinct usernames in a poll.
+Form keys use 1–64 lowercase ASCII letters, digits, underscores or hyphens.
+Send a JSON object of up to 64 KiB as `data`.
 
 `broadside.results(formKey)` returns a promise for
-`{form_key, count, rows, mine}`. Each row contains `username`, `data` and
-`created_at`. Submissions and results are available to signed-in users with
-project access. Handle rejected promises in the page.
+`{form_key, count, rows, mine}`. `rows` includes up to the 500 newest submissions,
+newest first. Each row contains `username`, `data` and `created_at`. `count` is
+the total number of submissions for the form, and `mine` indicates whether the
+viewer has ever submitted to it. Submissions and results are available to
+signed-in users with project access. Handle rejected promises in the page.
 
-An HTML poll that records one vote per viewer and refreshes the tally after a vote:
+Over JSON-RPC, `artifactSubmissionList(artifact_id, form_key='', since_id=0, limit=100)`
+lists submissions in ascending ID order, with `since_id` as an exclusive cursor.
+Use the last returned ID to request the next page. The maximum page size is 500.
+A `limit` of zero or less uses the default of 100.
+
+This HTML poll tallies each username's latest vote among the returned rows.
 
 ```html
 <h1>Which draft should we review?</h1>
@@ -63,10 +72,18 @@ An HTML poll that records one vote per viewer and refreshes the tally after a vo
   const tally = document.querySelector('#tally');
 
   async function refresh() {
-    const { rows } = await broadside.results('draft_poll');
-    const a = rows.filter(({ data }) => data.choice === 'a').length;
-    const b = rows.filter(({ data }) => data.choice === 'b').length;
-    tally.textContent = `Draft A — ${a} · Draft B — ${b}`;
+    const { count, rows } = await broadside.results('draft_poll');
+    const votes = new Map();
+    for (const { username, data } of rows) {
+      if (username !== null && !votes.has(username)) {
+        votes.set(username, data.choice);
+      }
+    }
+    const choices = [...votes.values()];
+    const a = choices.filter(choice => choice === 'a').length;
+    const b = choices.filter(choice => choice === 'b').length;
+    const scope = count > rows.length ? ` (latest ${rows.length} of ${count} submissions)` : '';
+    tally.textContent = `Draft A — ${a} · Draft B — ${b}${scope}`;
   }
 
   function showError(error) {

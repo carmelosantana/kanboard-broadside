@@ -4,6 +4,7 @@ namespace Kanboard\Plugin\Broadside\Api;
 
 use Kanboard\Plugin\Broadside\Model\BroadsideProcedureModel;
 use Kanboard\Plugin\Broadside\Model\CommentModel;
+use Kanboard\Plugin\Broadside\Model\SubmissionModel;
 use Pimple\Container;
 
 final class BroadsideProcedure
@@ -50,9 +51,9 @@ final class BroadsideProcedure
         return $this->model->createComment($artifact_id, $body, $parent_id, $quote);
     }
 
-    public function artifactSubmissionList($artifact_id, $form_key = '', $since_id = 0): array
+    public function artifactSubmissionList($artifact_id, $form_key = '', $since_id = 0, $limit = SubmissionModel::DEFAULT_LIMIT): array
     {
-        return $this->model->listSubmissions($artifact_id, $form_key, $since_id);
+        return $this->model->listSubmissions($artifact_id, $form_key, $since_id, $limit);
     }
 
     public function artifactRemove($artifact_id): bool
