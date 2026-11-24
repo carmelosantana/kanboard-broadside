@@ -1,0 +1,41 @@
+/* Neutral palette for both presets when Harbor is unavailable. */
+:root {
+    color-scheme: dark;
+    --background: oklch(.145 0 0);
+    --foreground: oklch(.985 0 0);
+    --card: oklch(.205 0 0);
+    --card-foreground: var(--foreground);
+    --primary: oklch(.922 0 0);
+    --primary-foreground: oklch(.205 0 0);
+    --secondary: oklch(.269 0 0);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--secondary);
+    --muted-foreground: oklch(.708 0 0);
+    --accent: var(--secondary);
+    --accent-foreground: var(--foreground);
+    --border: oklch(1 0 0 / 12%);
+    --input: var(--border);
+    --input-surface: var(--card);
+    --ring: var(--primary);
+    --radius: 8px;
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+    --space-1: .25rem;
+    --space-2: .5rem;
+    --space-3: .75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --control-height: 2.25rem;
+}
+
+html.theme-light {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(.145 0 0);
+    --card: var(--background);
+    --primary: oklch(.205 0 0);
+    --primary-foreground: oklch(.985 0 0);
+    --secondary: oklch(.97 0 0);
+    --muted-foreground: oklch(.556 0 0);
+    --border: oklch(.922 0 0);
+}

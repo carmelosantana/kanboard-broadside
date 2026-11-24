@@ -10,6 +10,7 @@ class Plugin extends Base
     public function initialize(): void
     {
         $this->container['broadsideArtifactModel'] = static fn ($container) => new ArtifactModel($container);
+        $this->route->addRoute('broadside/raw/:artifact_id/:version', 'RawController', 'show', 'Broadside');
     }
 
     public function getPluginName(): string
