@@ -8,6 +8,8 @@ use Kanboard\Core\Base;
 use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\CommentModel;
+use Kanboard\Plugin\Broadside\Model\Importer;
+use Kanboard\Plugin\Broadside\Model\Lint;
 use Kanboard\Plugin\Broadside\Model\SubmissionModel;
 use Pimple\Container;
 
@@ -28,6 +30,11 @@ final class BroadsideProcedure
     public function artifactGet($artifact_id, $version = 0): ?array
     {
         return $this->model->get($artifact_id, $version);
+    }
+
+    public function artifactImport($project_id, $title, $content, $format = 'html', $source_url = '', $artifact_id = 0): array
+    {
+        return $this->model->import($project_id, $title, $content, $format, $source_url, $artifact_id);
     }
 
     public function artifactList($project_id): array
@@ -71,12 +78,7 @@ final class BroadsideProcedureModel extends Base
 {
     public function publish(mixed $projectId, array $data): array
     {
-        $userId = $this->requireUser();
-        $projectId = $this->integerParam($projectId, 'project_id', 1);
-        if (! (new Access($this->container))->can($userId, $projectId, 'publish')) {
-            throw new AccessDeniedException();
-        }
-
+        [$projectId, $userId] = $this->requirePublisher($projectId);
         $data['artifact_id'] = $this->integerParam($data['artifact_id'], 'artifact_id', 0);
         $data['task_id'] = $this->integerParam($data['task_id'], 'task_id', 0);
         if (! is_string($data['source_url'])) {
@@ -84,8 +86,28 @@ final class BroadsideProcedureModel extends Base
         }
 
         $result = $this->container['broadsideArtifactModel']->publish($projectId, $userId, $data);
+        $warnings = $data['type'] === 'html' ? Lint::check($data['body']) : [];
 
-        return $result + ['url' => $this->viewerUrl($result['artifact_id']), 'warnings' => []];
+        return $result + ['url' => $this->viewerUrl($result['artifact_id']), 'warnings' => $warnings];
+    }
+
+    public function import(
+        mixed $projectId, mixed $title, mixed $content, mixed $format, mixed $sourceUrl, mixed $artifactId
+    ): array {
+        [$projectId, $userId] = $this->requirePublisher($projectId);
+        $artifactId = $this->integerParam($artifactId, 'artifact_id', 0);
+        if (! is_string($sourceUrl)) {
+            throw new InvalidArgumentException('source_url must be a string.');
+        }
+        if ($artifactId !== 0 && (int) ($this->findArtifact($artifactId)['project_id'] ?? 0) !== $projectId) {
+            throw new InvalidArgumentException('Artifact is unavailable in this project.');
+        }
+
+        $result = (new Importer($this->container))->import(
+            $projectId, $userId, $title, $content, $format, $sourceUrl, $artifactId
+        );
+
+        return $result + ['url' => $this->viewerUrl($result['artifact_id'])];
     }
 
     public function get(mixed $artifactId, mixed $version): ?array
@@ -218,6 +240,17 @@ final class BroadsideProcedureModel extends Base
         } catch (AccessForbiddenException $e) {
             throw new AccessDeniedException();
         }
+    }
+
+    private function requirePublisher(mixed $projectId): array
+    {
+        $userId = $this->requireUser();
+        $projectId = $this->integerParam($projectId, 'project_id', 1);
+        if (! (new Access($this->container))->can($userId, $projectId, 'publish')) {
+            throw new AccessDeniedException();
+        }
+
+        return [$projectId, $userId];
     }
 
     private function requireUser(): int

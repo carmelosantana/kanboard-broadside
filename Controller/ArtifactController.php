@@ -7,13 +7,16 @@ use Kanboard\Controller\BaseController;
 use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\CommentModel;
+use Kanboard\Plugin\Broadside\Model\Importer;
 
 class ArtifactController extends BaseController
 {
     public function index(): void
     {
         $projectId = $this->request->getIntegerParam('project_id');
-        if (! (new Access($this->container))->can((int) $this->userSession->getId(), $projectId, 'view')) {
+        $userId = (int) $this->userSession->getId();
+        $access = new Access($this->container);
+        if (! $access->can($userId, $projectId, 'view')) {
             $this->response->status(404);
             return;
         }
@@ -35,14 +38,71 @@ class ArtifactController extends BaseController
             }
         }
 
-        $this->renderProject('list', [
+        $list = [
             'project' => $this->projectModel->getById($projectId),
             'title' => t('Artifacts'),
             'artifacts' => $artifacts,
             'hasArtifacts' => $hasArtifacts,
             'publishers' => $publishers,
             'search' => $search,
-        ]);
+        ];
+        if ($access->can($userId, $projectId, 'publish')) {
+            $this->renderProject('upload', $list + ['list' => $list]);
+            return;
+        }
+
+        $this->renderProject('list', $list);
+    }
+
+    public function upload(): void
+    {
+        $projectId = $this->request->getIntegerParam('project_id');
+        $userId = (int) $this->userSession->getId();
+        if (! (new Access($this->container))->can($userId, $projectId, 'publish')) {
+            throw new AccessForbiddenException();
+        }
+
+        $params = ['project' => $this->projectModel->getById($projectId), 'title' => t('Upload artifact')];
+        if (! $this->request->isPost()) {
+            $this->renderProject('upload', $params);
+            return;
+        }
+
+        $this->checkCSRFForm();
+        $file = $this->request->getFileInfo('artifact');
+        $title = $this->request->getRawValue('title');
+        $filename = $file['name'] ?? '';
+        $type = match (is_string($filename) ? strtolower(pathinfo($filename, PATHINFO_EXTENSION)) : '') {
+            'html' => 'html',
+            'md' => 'markdown',
+            default => null,
+        };
+
+        try {
+            if (! is_string($title) || trim($title) === '') {
+                throw new InvalidArgumentException(t('Enter an artifact title.'));
+            }
+            if ($type === null || ($file['error'] ?? null) !== UPLOAD_ERR_OK
+                || ($file['size'] ?? PHP_INT_MAX) > Importer::MAX_CONTENT_BYTES) {
+                throw new InvalidArgumentException(t('Choose an .html or .md file of at most 5 MiB.'));
+            }
+
+            $result = $this->container['broadsideArtifactModel']->publish($projectId, $userId, [
+                'title' => trim($title),
+                'type' => $type,
+                'body' => $this->request->getFileContent('artifact'),
+            ]);
+        } catch (InvalidArgumentException $e) {
+            $this->renderProject('upload', $params + [
+                'error' => $e->getMessage(),
+                'artifactTitle' => is_string($title) ? $title : '',
+            ], 400);
+            return;
+        }
+
+        $this->response->redirect($this->helper->url->to('ArtifactController', 'show', [
+            'plugin' => 'Broadside', 'artifact_id' => $result['artifact_id'],
+        ]));
     }
 
     public function show(): void
@@ -143,9 +203,9 @@ class ArtifactController extends BaseController
         return $this->db->table('broadside_artifacts')->eq('id', $artifactId)->eq('is_removed', 0)->findOne();
     }
 
-    private function renderProject(string $template, array $params): void
+    private function renderProject(string $template, array $params, int $status = 200): void
     {
         $this->hook->on('template:layout:css', ['template' => 'plugins/Broadside/Assets/css/viewer.css']);
-        $this->response->html($this->helper->layout->project('Broadside:artifact/'.$template, $params));
+        $this->response->html($this->helper->layout->project('Broadside:artifact/'.$template, $params), $status);
     }
 }
