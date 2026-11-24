@@ -5,6 +5,7 @@ use JsonRPC\Request\RequestParser;
 use JsonRPC\Response\ResponseBuilder;
 use JsonRPC\Server;
 use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
+use Kanboard\Plugin\Broadside\Model\BroadsideProcedureModel;
 use KanboardTests\units\Base;
 
 require_once __DIR__.'/BroadsideHarness.php';
@@ -156,6 +157,31 @@ class ProcedureTest extends Base
         $this->assertStringContainsString('broadside.submit', $contract);
     }
 
+    public function testProcedureModelHasItsOwnAutoloadableClassFile(): void
+    {
+        $class = new ReflectionClass(BroadsideProcedureModel::class);
+        $this->assertSame(realpath(__DIR__.'/../Model/BroadsideProcedureModel.php'), $class->getFileName());
+    }
+
+    public function testArtifactLookupReturnsOnlyActiveArtifacts(): void
+    {
+        $id = $this->publishReport()['artifact_id'];
+        $artifacts = $this->container['broadsideArtifactModel'];
+        $this->assertSame($id, (int) $artifacts->find($id)['id']);
+        $this->assertNull($artifacts->find($id + 1));
+        $this->assertTrue($artifacts->remove($id));
+        $this->assertNull($artifacts->find($id));
+    }
+
+    public function testOutsiderReceivesSameRefusalForExistingAndMissingArtifact(): void
+    {
+        $id = $this->publishReport()['artifact_id'];
+        $this->loginAs('outsider');
+
+        $this->assertForbidden(fn () => $this->procedure->artifactRemove($id));
+        $this->assertForbidden(fn () => $this->procedure->artifactRemove($id + 1));
+    }
+
     public function testOnlyManagerCanRemoveAndRemovedArtifactIsHidden(): void
     {
         $id = $this->publishReport()['artifact_id'];
@@ -164,6 +190,7 @@ class ProcedureTest extends Base
 
         $this->loginAs('manager');
         $this->assertTrue($this->procedure->artifactRemove($id));
+        $this->assertForbidden(fn () => $this->procedure->artifactRemove($id));
 
         $this->loginAs('viewer');
         $this->assertNull($this->procedure->artifactGet($id));

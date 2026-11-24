@@ -103,7 +103,7 @@ class ArtifactController extends BaseController
     public function show(): void
     {
         $artifactId = $this->request->getIntegerParam('artifact_id');
-        $artifact = $this->findArtifact($artifactId);
+        $artifact = $this->container['broadsideArtifactModel']->find($artifactId);
         $access = new Access($this->container);
         $userId = (int) $this->userSession->getId();
 
@@ -165,7 +165,7 @@ class ArtifactController extends BaseController
         $this->checkCSRFForm();
 
         $artifactId = $this->request->getIntegerParam('artifact_id');
-        $artifact = $this->findArtifact($artifactId);
+        $artifact = $this->container['broadsideArtifactModel']->find($artifactId);
         $userId = (int) $this->userSession->getId();
         if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'comment')) {
             throw new AccessForbiddenException();
@@ -191,11 +191,6 @@ class ArtifactController extends BaseController
         }
 
         $this->response->redirect($comments->permalink($artifactId, $version, 'comment-'.$id));
-    }
-
-    private function findArtifact(int $artifactId): ?array
-    {
-        return $this->db->table('broadside_artifacts')->eq('id', $artifactId)->eq('is_removed', 0)->findOne();
     }
 
     private function renderProject(string $template, array $params, int $status = 200): void

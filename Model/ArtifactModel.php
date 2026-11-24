@@ -85,6 +85,16 @@ class ArtifactModel extends Base
         return ['artifact_id' => $artifactId, 'version' => $version];
     }
 
+    public function find(int $id): ?array
+    {
+        return $this->db->table('broadside_artifacts')->eq('id', $id)->eq('is_removed', 0)->findOne();
+    }
+
+    public function findByShareToken(string $token): ?array
+    {
+        return $this->db->table('broadside_artifacts')->eq('share_token', $token)->eq('is_removed', 0)->findOne();
+    }
+
     public function getVersion(int $id, int $number): ?string
     {
         $body = $this->db->table('broadside_versions')->eq('artifact_id', $id)->eq('number', $number)
@@ -108,7 +118,7 @@ class ArtifactModel extends Base
 
     public function setShare(int $id, int $userId, bool $enabled): ?string
     {
-        $artifact = $this->db->table('broadside_artifacts')->eq('id', $id)->eq('is_removed', 0)->findOne();
+        $artifact = $this->find($id);
         if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'share')) {
             throw new AccessForbiddenException();
         }
@@ -124,7 +134,7 @@ class ArtifactModel extends Base
         try {
             $pdo->prepare('UPDATE broadside_artifacts SET share_token = COALESCE(share_token, ?)
                 WHERE id = ? AND is_removed = 0')->execute([$token, $id]);
-            $stored = $this->db->table('broadside_artifacts')->eq('id', $id)->eq('is_removed', 0)->findOne();
+            $stored = $this->find($id);
             if (empty($stored)) {
                 throw new AccessForbiddenException();
             }

@@ -16,8 +16,7 @@ class ShareController extends RawController
             return;
         }
 
-        $artifact = $this->db->table('broadside_artifacts')->eq('share_token', $token)
-            ->eq('is_removed', 0)->findOne();
+        $artifact = $this->container['broadsideArtifactModel']->findByShareToken($token);
         if (empty($artifact) || ! (new Access($this->container))->canViewShare($artifact, $token)) {
             $this->response->status(404);
             return;

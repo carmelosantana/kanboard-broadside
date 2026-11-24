@@ -12,10 +12,7 @@ class RawController extends BaseController
     {
         $artifactId = $this->request->getIntegerParam('artifact_id');
         $version = $this->request->getIntegerParam('version');
-        $artifact = $this->db->table('broadside_artifacts')
-            ->eq('id', $artifactId)
-            ->eq('is_removed', 0)
-            ->findOne();
+        $artifact = $this->container['broadsideArtifactModel']->find($artifactId);
 
         $this->response->withHeader('Cache-Control', 'private, no-store');
         $access = new Access($this->container);

@@ -47,7 +47,7 @@ class BridgeController extends BaseController
         }
 
         $artifactId = $this->request->getIntegerParam('artifact_id');
-        $artifact = $this->db->table('broadside_artifacts')->eq('id', $artifactId)->eq('is_removed', 0)->findOne();
+        $artifact = $this->container['broadsideArtifactModel']->find($artifactId);
         $userId = (int) $this->userSession->getId();
         if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], $permission)) {
             $this->error(404, 'not_found', 'No such artifact.');
