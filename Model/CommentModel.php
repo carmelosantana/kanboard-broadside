@@ -10,6 +10,8 @@ use RuntimeException;
 /** Comment storage. Callers authorize user actions through Access. */
 class CommentModel extends Base
 {
+    public const DEFAULT_LIMIT = 100;
+
     public function create(
         int $artifactId,
         int $userId,
@@ -21,9 +23,13 @@ class CommentModel extends Base
         if (! is_string($body) || trim($body) === '') {
             throw new InvalidArgumentException('Comment body must be a non-empty string.');
         }
+        if (mb_strlen($body, 'UTF-8') > 20000) {
+            throw new InvalidArgumentException('Comment body must be at most 20,000 characters.');
+        }
         if (! is_string($quote)) {
             throw new InvalidArgumentException('Comment quote must be a string.');
         }
+        $quote = mb_substr($quote, 0, 1000, 'UTF-8');
         if ($parentId !== 0 && ! $this->db->table('broadside_comments')
             ->eq('artifact_id', $artifactId)->eq('id', $parentId)->exists()) {
             throw new InvalidArgumentException('Parent comment must belong to the artifact.');
@@ -49,9 +55,10 @@ class CommentModel extends Base
         return (int) $this->db->getLastId();
     }
 
-    public function listByProject(int $projectId, int $sinceId = 0, int $limit = 100, int $artifactId = 0): array
+    public function listByProject(int $projectId, int $sinceId = 0, int $limit = self::DEFAULT_LIMIT, int $artifactId = 0): array
     {
-        return $this->fetch($projectId, $sinceId, $artifactId, min($limit, 500));
+        $limit = $limit <= 0 ? self::DEFAULT_LIMIT : min($limit, 500);
+        return $this->fetch($projectId, $sinceId, $artifactId, $limit);
     }
 
     public function listByArtifact(int $projectId, int $artifactId): array

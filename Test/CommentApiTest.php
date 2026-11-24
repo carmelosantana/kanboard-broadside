@@ -71,6 +71,20 @@ class CommentApiTest extends Base
         $this->assertCount(500, $this->procedure->artifactCommentList($this->project, 0, 1000));
     }
 
+    public function testPollerUsesTheDefaultForNonPositiveLimits(): void
+    {
+        $artifact = $this->publish($this->project, 'Report');
+        for ($i = 0; $i < 101; ++$i) {
+            $this->seedComment($artifact, 10);
+        }
+
+        $this->loginAs('viewer');
+        $expected = $this->procedure->artifactCommentList($this->project);
+        foreach ([0, -1, '-2'] as $limit) {
+            $this->assertSame($expected, $this->procedure->artifactCommentList($this->project, 0, $limit));
+        }
+    }
+
     public function testUnauthorizedCallersGetForbidden(): void
     {
         $artifact = $this->publish($this->project, 'Report');

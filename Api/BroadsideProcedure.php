@@ -3,6 +3,7 @@
 namespace Kanboard\Plugin\Broadside\Api;
 
 use Kanboard\Plugin\Broadside\Model\BroadsideProcedureModel;
+use Kanboard\Plugin\Broadside\Model\CommentModel;
 use Pimple\Container;
 
 final class BroadsideProcedure
@@ -39,7 +40,7 @@ final class BroadsideProcedure
         return $this->model->getContract();
     }
 
-    public function artifactCommentList($project_id, $since_id = 0, $limit = 100, $artifact_id = 0): array
+    public function artifactCommentList($project_id, $since_id = 0, $limit = CommentModel::DEFAULT_LIMIT, $artifact_id = 0): array
     {
         return $this->model->listComments($project_id, $since_id, $limit, $artifact_id);
     }

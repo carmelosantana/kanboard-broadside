@@ -74,11 +74,9 @@
             send('broadside:height', { height });
         };
         const relaySelection = () => {
-            const selection = window.getSelection()?.toString().trim();
-            if (selection) {
-                const text = Array.from(selection).slice(0, 1000).join('');
-                send('broadside:selection', { text });
-            }
+            const selection = window.getSelection()?.toString().trim() ?? '';
+            const text = Array.from(selection).slice(0, 1000).join('');
+            send('broadside:selection', { text });
         };
 
         document.addEventListener('mouseup', relaySelection);

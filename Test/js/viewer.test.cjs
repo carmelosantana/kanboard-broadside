@@ -100,6 +100,38 @@ test('viewer resizes only for finite heights from its own iframe with the negoti
     assert.equal(frame.style.height, '20000px');
 });
 
+test('viewer hides the quote control on deselection and keeps a quote already copied', () => {
+    const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
+    const nonce = 'frame-nonce';
+    const frameWindow = { postMessage() {} };
+    const quote = { value: '', focus() {} };
+    const button = { hidden: true };
+    const elements = {
+        '#broadside-frame': { contentWindow: frameWindow, dataset: {} },
+        '#broadside-comment-quote': quote,
+        '#broadside-quote-selection': button,
+    };
+    let listener;
+
+    vm.runInNewContext(script, {
+        document: {
+            documentElement: { classList: { contains: () => false } },
+            querySelector: (selector) => elements[selector],
+        },
+        window: { addEventListener: (type, callback) => { listener = callback; } },
+        MutationObserver: class { observe() {} },
+    });
+
+    listener({ source: frameWindow, data: { type: 'broadside:ready', nonce } });
+    const select = (text) => listener({ source: frameWindow, data: { type: 'broadside:selection', nonce, text } });
+    select('Release notes');
+    assert.equal(button.hidden, false);
+    button.onclick();
+    select('');
+    assert.equal(button.hidden, true);
+    assert.equal(quote.value, 'Release notes');
+});
+
 test('viewer relays only its own iframe requests with the negotiated nonce', async () => {
     const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
     const messages = [];

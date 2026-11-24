@@ -4,7 +4,6 @@
     const root = document.documentElement;
     let frame;
     let nonce;
-    let selection = '';
 
     function relaySelection(text) {
         const quote = document.querySelector('#broadside-comment-quote');
@@ -13,8 +12,12 @@
             return;
         }
 
-        selection = text.trim();
+        const selection = text.trim();
         button.hidden = selection === '';
+        if (button.hidden) {
+            button.onclick = null;
+            return;
+        }
         button.onclick = () => {
             quote.value = selection;
             quote.focus();

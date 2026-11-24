@@ -4,6 +4,7 @@ use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Core\Http\Request;
 use Kanboard\Core\Http\Response;
 use Kanboard\Plugin\Broadside\Controller\ArtifactController;
+use Kanboard\Plugin\Broadside\Model\CommentModel;
 use KanboardTests\units\Base;
 
 require_once __DIR__.'/BroadsideHarness.php';
@@ -32,6 +33,25 @@ class CommentModelTest extends Base
     public function testOutsiderWithValidCsrfTokenIsRejected(): void
     {
         $this->assertPostForbidden('outsider', $this->container['token']->getCSRFToken());
+    }
+
+    public function testRejectsBodiesOverTwentyThousandCharacters(): void
+    {
+        $model = new CommentModel($this->container);
+        $this->expectException(InvalidArgumentException::class);
+        $model->create($this->artifact, $this->users['viewer'], str_repeat('é', 20001));
+    }
+
+    public function testStoresTheMaximumLengthBodyAndTruncatesTheQuoteByCharacter(): void
+    {
+        $model = new CommentModel($this->container);
+        $body = str_repeat('é', 20000);
+        $quote = str_repeat('船', 1000);
+        $model->create($this->artifact, $this->users['viewer'], $body, quote: $quote.'extra');
+
+        [$comment] = $model->listByArtifact($this->project, $this->artifact);
+        $this->assertSame($body, $comment['body']);
+        $this->assertSame($quote, $comment['quote']);
     }
 
     public function testViewerCanCommentOnTheDisplayedVersionAndReadRenderedMarkdown(): void

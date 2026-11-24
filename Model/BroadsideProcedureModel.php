@@ -98,7 +98,7 @@ final class BroadsideProcedureModel extends Base
         }
 
         $sinceId = $this->integerParam($sinceId, 'since_id', 0);
-        $limit = $this->integerParam($limit, 'limit', 0);
+        $limit = $this->integerParam($limit, 'limit', PHP_INT_MIN);
         $artifactId = $this->integerParam($artifactId, 'artifact_id', 0);
         $comments = new CommentModel($this->container);
 

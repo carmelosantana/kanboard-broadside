@@ -3,7 +3,7 @@ const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const vm = require('node:vm');
 
-test('frame bridge relays non-empty mouse and keyboard selections to the viewer', () => {
+test('frame bridge relays mouse and keyboard selections, including deselection', () => {
     const script = readFileSync(require.resolve('../../Assets/js/frame-bridge.js'), 'utf8');
     const origin = 'https://kanboard.example';
     const nonce = 'frame-nonce';
@@ -31,19 +31,20 @@ test('frame bridge relays non-empty mouse and keyboard selections to the viewer'
     }
 
     assert.deepEqual({ ...messages.shift()[0] }, { type: 'broadside:ready', nonce });
-    dispatch('mouseup');
-    selection = '   ';
-    dispatch('keyup');
-    assert.equal(messages.length, 0);
-
     selection = '  Release notes  ';
     dispatch('mouseup');
+    selection = '';
+    dispatch('mouseup');
     selection = '🚢'.repeat(1001);
+    dispatch('keyup');
+    selection = '   ';
     dispatch('keyup');
 
     assert.deepEqual(messages.map(([message, target]) => [{ ...message }, target]), [
         [{ type: 'broadside:selection', nonce, text: 'Release notes' }, origin],
+        [{ type: 'broadside:selection', nonce, text: '' }, origin],
         [{ type: 'broadside:selection', nonce, text: '🚢'.repeat(1000) }, origin],
+        [{ type: 'broadside:selection', nonce, text: '' }, origin],
     ]);
 });
 
