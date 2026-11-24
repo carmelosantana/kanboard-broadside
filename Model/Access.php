@@ -7,6 +7,13 @@ use Kanboard\Core\Security\Role;
 
 class Access extends Base
 {
+    public function canViewShare(array $artifact, string $token): bool
+    {
+        $stored = $artifact['share_token'] ?? null;
+
+        return is_string($stored) && $stored !== '' && hash_equals($stored, $token);
+    }
+
     public function can(int $userId, int $projectId, string $action): bool
     {
         $user = $this->userModel->getById($userId);

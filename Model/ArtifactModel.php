@@ -4,9 +4,10 @@ namespace Kanboard\Plugin\Broadside\Model;
 
 use InvalidArgumentException;
 use Kanboard\Core\Base;
+use Kanboard\Core\Controller\AccessForbiddenException;
 use Throwable;
 
-/** Artifact storage. Callers authorize user actions through Access. */
+/** Artifact storage and share link management. */
 class ArtifactModel extends Base
 {
     private const MAX_BODY_BYTES = 5 * 1024 * 1024;
@@ -94,5 +95,45 @@ class ArtifactModel extends Base
         $result = $this->db->execute('UPDATE broadside_artifacts SET is_removed = 1 WHERE id = ? AND is_removed = 0', [$id]);
 
         return $result !== false && $result->rowCount() === 1;
+    }
+
+    public function setShare(int $id, int $userId, bool $enabled): ?string
+    {
+        $artifact = $this->db->table('broadside_artifacts')->eq('id', $id)->eq('is_removed', 0)->findOne();
+        if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'share')) {
+            throw new AccessForbiddenException();
+        }
+
+        if (! $enabled) {
+            $this->db->execute('UPDATE broadside_artifacts SET share_token = NULL WHERE id = ? AND is_removed = 0', [$id]);
+            return null;
+        }
+
+        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        $pdo = $this->db->getConnection();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE broadside_artifacts SET share_token = COALESCE(share_token, ?)
+                WHERE id = ? AND is_removed = 0')->execute([$token, $id]);
+            $stored = $this->db->table('broadside_artifacts')->eq('id', $id)->eq('is_removed', 0)->findOne();
+            if (empty($stored)) {
+                throw new AccessForbiddenException();
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return $this->shareUrl($stored['share_token']);
+    }
+
+    public function shareUrl(string $token): string
+    {
+        return $this->helper->url->to('ShareController', 'show', [
+            'plugin' => 'Broadside', 'token' => $token,
+        ], '', true);
     }
 }

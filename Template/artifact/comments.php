@@ -1,7 +1,7 @@
 <div class="sidebar-container">
     <div class="sidebar-content">
         <?= $this->render('Broadside:artifact/show', compact(
-            'project', 'artifact', 'version', 'versions', 'rawUrl', 'theme', 'preset', 'csrf'
+            'project', 'artifact', 'version', 'versions', 'rawUrl', 'theme', 'preset', 'csrf', 'canShare', 'shareUrl'
         )) ?>
     </div>
     <aside class="sidebar" id="broadside-comments" aria-labelledby="broadside-comments-heading" style="padding-inline-start: 1rem; overflow-wrap: anywhere">

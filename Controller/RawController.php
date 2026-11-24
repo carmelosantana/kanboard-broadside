@@ -24,7 +24,12 @@ class RawController extends BaseController
             return;
         }
 
-        $body = $this->container['broadsideArtifactModel']->getVersion($artifactId, $version);
+        $this->renderArtifact($artifact, $version);
+    }
+
+    protected function renderArtifact(array $artifact, int $version, bool $readOnly = false): void
+    {
+        $body = $this->container['broadsideArtifactModel']->getVersion((int) $artifact['id'], $version);
         if ($body === null) {
             $this->response->status(404);
             return;
@@ -34,7 +39,8 @@ class RawController extends BaseController
             $body,
             $artifact['type'],
             $this->request->getStringParam('theme', $this->userSession->getTheme()),
-            $this->request->getStringParam('preset', $this->configModel->get('harbor_preset', 'newburgh'))
+            $this->request->getStringParam('preset', $this->configModel->get('harbor_preset', 'newburgh')),
+            $readOnly
         );
 
         $this->response

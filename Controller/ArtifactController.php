@@ -49,10 +49,10 @@ class ArtifactController extends BaseController
     {
         $artifactId = $this->request->getIntegerParam('artifact_id');
         $artifact = $this->findArtifact($artifactId);
+        $access = new Access($this->container);
+        $userId = (int) $this->userSession->getId();
 
-        if (empty($artifact) || ! (new Access($this->container))->can(
-            (int) $this->userSession->getId(), (int) $artifact['project_id'], 'view'
-        )) {
+        if (empty($artifact) || ! $access->can($userId, (int) $artifact['project_id'], 'view')) {
             $this->response->status(404);
             return;
         }
@@ -77,6 +77,13 @@ class ArtifactController extends BaseController
         $rawUrl .= (str_contains($rawUrl, '?') ? '&' : '?').http_build_query([
             'theme' => $theme, 'preset' => $preset,
         ]);
+        $canShare = $access->can($userId, (int) $artifact['project_id'], 'share');
+        $shareUrl = $canShare && $artifact['share_token'] !== null
+            ? $this->container['broadsideArtifactModel']->shareUrl($artifact['share_token'])
+            : null;
+        if ($shareUrl !== null) {
+            $this->response->withHeader('Cache-Control', 'private, no-store');
+        }
 
         $this->renderProject('comments', [
             'project' => $this->projectModel->getById($artifact['project_id']),
@@ -88,6 +95,8 @@ class ArtifactController extends BaseController
             'theme' => $theme,
             'preset' => $preset,
             'csrf' => $this->token->getReusableCSRFToken(),
+            'canShare' => $canShare,
+            'shareUrl' => $shareUrl,
             'comments' => (new CommentModel($this->container))->listByArtifact((int) $artifact['project_id'], $artifactId),
         ]);
     }

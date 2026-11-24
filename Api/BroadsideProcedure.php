@@ -5,6 +5,7 @@ namespace Kanboard\Plugin\Broadside\Api;
 use InvalidArgumentException;
 use JsonRPC\Exception\AccessDeniedException;
 use Kanboard\Core\Base;
+use Kanboard\Core\Controller\AccessForbiddenException;
 use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\CommentModel;
 use Kanboard\Plugin\Broadside\Model\SubmissionModel;
@@ -57,6 +58,11 @@ final class BroadsideProcedure
     public function artifactRemove($artifact_id): bool
     {
         return $this->model->remove($artifact_id);
+    }
+
+    public function artifactShare($artifact_id, $enabled): array
+    {
+        return $this->model->share($artifact_id, $enabled);
     }
 }
 
@@ -197,6 +203,21 @@ final class BroadsideProcedureModel extends Base
         }
 
         return $this->container['broadsideArtifactModel']->remove($artifactId);
+    }
+
+    public function share(mixed $artifactId, mixed $enabled): array
+    {
+        $userId = $this->requireUser();
+        $artifactId = $this->integerParam($artifactId, 'artifact_id', 1);
+        if (! is_bool($enabled)) {
+            throw new InvalidArgumentException('enabled must be a boolean.');
+        }
+
+        try {
+            return ['url' => $this->container['broadsideArtifactModel']->setShare($artifactId, $userId, $enabled)];
+        } catch (AccessForbiddenException $e) {
+            throw new AccessDeniedException();
+        }
     }
 
     private function requireUser(): int

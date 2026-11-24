@@ -3,6 +3,7 @@
 namespace Kanboard\Plugin\Broadside;
 
 use Kanboard\Core\Plugin\Base;
+use Kanboard\Core\Security\Role;
 use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
 use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\ArtifactModel;
@@ -17,6 +18,8 @@ class Plugin extends Base
         $this->route->addRoute('broadside/artifact/:artifact_id', 'ArtifactController', 'show', 'Broadside');
         $this->route->addRoute('broadside/artifact/:artifact_id/submit', 'BridgeController', 'submit', 'Broadside');
         $this->route->addRoute('broadside/artifact/:artifact_id/results', 'BridgeController', 'results', 'Broadside');
+        $this->route->addRoute('broadside/s/:token', 'ShareController', 'show', 'Broadside');
+        $this->applicationAccessMap->add('ShareController', 'show', Role::APP_PUBLIC);
 
         $access = new Access($this->container);
         $canView = fn (int $projectId): bool => $access->can((int) $this->userSession->getId(), $projectId, 'view');

@@ -21,6 +21,17 @@ $versionSeparator = str_contains($viewerUrl, '?') ? '&' : '?';
             <?php endforeach ?>
         </ul>
     </details>
+    <?php if ($canShare): ?>
+        <form method="post" action="<?= $this->text->e($this->url->to('ShareController', 'toggle', $artifactParams)) ?>">
+            <?= $this->form->csrf() ?>
+            <?php if ($shareUrl !== null): ?>
+                <a href="<?= $this->text->e($shareUrl) ?>" rel="noreferrer"><?= t('Public link') ?></a>
+            <?php endif ?>
+            <button type="submit" class="btn" name="enabled" value="<?= $shareUrl === null ? '1' : '0' ?>">
+                <?= $shareUrl === null ? t('Create public link') : t('Revoke public link') ?>
+            </button>
+        </form>
+    <?php endif ?>
     <?php // Load the listener before the iframe can send its ready message. ?>
     <script src="<?= $this->text->e($this->url->dir().'plugins/Broadside/Assets/js/viewer.js?'.filemtime(__DIR__.'/../../Assets/js/viewer.js')) ?>"></script>
     <iframe class="broadside-frame" id="broadside-frame"

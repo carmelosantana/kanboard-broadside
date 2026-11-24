@@ -30,7 +30,7 @@ class Renderer
     ) {
     }
 
-    public function render(string $body, string $type, mixed $theme = 'dark', mixed $preset = 'newburgh'): string
+    public function render(string $body, string $type, mixed $theme = 'dark', mixed $preset = 'newburgh', bool $readOnly = false): string
     {
         if ($type === 'markdown') {
             $parser = (new Markdown($this->container, false))->setSafeMode(true)->setMarkupEscaped(true);
@@ -51,8 +51,12 @@ class Renderer
         $base->textContent = file_get_contents(__DIR__.'/../Assets/css/base.css');
         $bridge = $document->createElement('script');
         $bridge->id = 'broadside-bridge';
-        $bridge->setAttribute('data-nonce', bin2hex(random_bytes(16)));
-        $bridge->textContent = file_get_contents(__DIR__.'/../Assets/js/frame-bridge.js');
+        if ($readOnly) {
+            $bridge->textContent = 'window.broadside = Object.freeze({ readOnly: true, onTheme() { return () => {}; } });';
+        } else {
+            $bridge->setAttribute('data-nonce', bin2hex(random_bytes(16)));
+            $bridge->textContent = file_get_contents(__DIR__.'/../Assets/js/frame-bridge.js');
+        }
 
         // The HTML parser supplies a head even for fragments and headless documents.
         $document->documentElement->firstElementChild->prepend($tokens, $base, $bridge);
