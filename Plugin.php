@@ -3,11 +3,13 @@
 namespace Kanboard\Plugin\Broadside;
 
 use Kanboard\Core\Plugin\Base;
+use Kanboard\Plugin\Broadside\Model\ArtifactModel;
 
 class Plugin extends Base
 {
     public function initialize(): void
     {
+        $this->container['broadsideArtifactModel'] = static fn ($container) => new ArtifactModel($container);
     }
 
     public function getPluginName(): string
