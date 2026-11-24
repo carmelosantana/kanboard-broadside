@@ -73,10 +73,39 @@ class RendererTest extends Base
                 file_get_contents(__DIR__.'/../Assets/css/tokens-fallback.css'),
                 $document->querySelector('style#broadside-tokens')->textContent
             );
-            $tokens = ':root { --harbor-fixture: 1; }';
+            $tokens = <<<'CSS'
+                /* Harbor's tokens and application styles share one file. */
+                :root { --harbor-fixture: 1; color-scheme: dark; background: red; }
+                html { --fixture-html: 2; color: red; }
+                :root.preset-newburgh { --fixture-newburgh: 3; }
+                html.theme-light, html.preset-shadcn.theme-light { color-scheme: light; --fixture-light: 4; }
+                html:root { --fixture-shared: var(--harbor-fixture); --fixture-image: url("data:image/svg+xml;charset=utf-8,fixture"); }
+                html:root:not(.theme-light) { --fixture-dark: rgb(0 0 0 / 0.25); }
+                header{background:red}
+                a{text-decoration:none}
+                :root .sidebar { --fixture-chrome: red; }
+                @media (prefers-reduced-motion: reduce) {
+                    :root { --fixture-nested: red; }
+                }
+                html.theme-dark, .sidebar { --fixture-mixed: 5; }
+                CSS;
             file_put_contents($directory.'/tokens.css', $tokens);
             $document = HTMLDocument::createFromString($renderer->render('', 'html'));
-            $this->assertSame($tokens, $document->querySelector('style#broadside-tokens')->textContent);
+            $injected = $document->querySelector('style#broadside-tokens')->textContent;
+            foreach (['header', 'text-decoration', 'background:', 'color: red', '.sidebar', '--fixture-chrome', '--fixture-nested'] as $chrome) {
+                $this->assertStringNotContainsString($chrome, $injected);
+            }
+            foreach ([
+                ':root { --harbor-fixture: 1; color-scheme: dark; }',
+                'html { --fixture-html: 2; }',
+                ':root.preset-newburgh { --fixture-newburgh: 3; }',
+                'html.theme-light, html.preset-shadcn.theme-light { color-scheme: light; --fixture-light: 4; }',
+                'html:root { --fixture-shared: var(--harbor-fixture); --fixture-image: url("data:image/svg+xml;charset=utf-8,fixture"); }',
+                'html:root:not(.theme-light) { --fixture-dark: rgb(0 0 0 / 0.25); }',
+                'html.theme-dark { --fixture-mixed: 5; }',
+            ] as $rule) {
+                $this->assertStringContainsString($rule, $injected);
+            }
         } finally {
             if (is_file($directory.'/tokens.css')) {
                 unlink($directory.'/tokens.css');

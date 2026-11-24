@@ -24,6 +24,15 @@ class Renderer
         'base-uri' => "'none'",
     ];
 
+    // Keep delimiters inside CSS strings, functions and nested blocks together.
+    private const CSS_GROUPS = <<<'REGEX'
+        (?(DEFINE)
+            (?<quoted> "(?:[^"\\]++|\\.)*" | '(?:[^'\\]++|\\.)*' )
+            (?<parens> \((?:(?&quoted)|(?&parens)|\\.|[^()"'\\]++)*\) )
+            (?<block> \{(?:(?&quoted)|(?&parens)|(?&block)|\\.|[^{}()"'\\]++)*\} )
+        )
+        REGEX;
+
     public function __construct(
         private readonly Container $container,
         private readonly string $pluginsRoot = PLUGINS_DIR,
@@ -68,9 +77,47 @@ class Renderer
     {
         $harbor = $this->pluginsRoot.'/Harbor/Assets/css/tokens.css';
         if (is_file($harbor) && is_readable($harbor)) {
-            return file_get_contents($harbor);
+            $sheet = file_get_contents($harbor);
+            if ($sheet !== false) {
+                return $this->harborTokens($sheet);
+            }
         }
 
         return file_get_contents(__DIR__.'/../Assets/css/tokens-fallback.css');
+    }
+
+    private function harborTokens(string $css): string
+    {
+        $css = preg_replace('~(?&quoted)(*SKIP)(*F)|/\*.*?\*/'.self::CSS_GROUPS.'~sx', ' ', $css) ?? '';
+        $rulePattern = <<<'REGEX'
+            \G ((?:(?&quoted)|(?&parens)|\\.|[^;{}()"'\\]++)*) ((?&block)|;)
+            REGEX;
+        $declarationPattern = <<<'REGEX'
+            \G ((?:(?&quoted)|(?&parens)|(?&block)|\\.|[^;{}()"'\\]++)*) (?:;|\z)
+            REGEX;
+        $rootSelector = '~\A(?:html(?::root)?|:root)(?:\.(?:theme|preset)-[\w-]+|:not\(\.(?:theme|preset)-[\w-]+\))*\z~';
+
+        preg_match_all('~'.$rulePattern.self::CSS_GROUPS.'~sx', $css, $rules, PREG_SET_ORDER);
+        $tokens = [];
+        foreach ($rules as [, $selectorList, $block]) {
+            $selectorList = trim($selectorList);
+            if ($block === ';' || str_starts_with($selectorList, '@')) {
+                continue;
+            }
+
+            $selectors = preg_split('~(?:(?&quoted)|(?&parens)|\\.)(*SKIP)(*F)|,'.self::CSS_GROUPS.'~sx', $selectorList);
+            $selectors = preg_grep($rootSelector, array_map('trim', $selectors ?: []));
+            if ($selectors === []) {
+                continue;
+            }
+
+            preg_match_all('~'.$declarationPattern.self::CSS_GROUPS.'~sx', substr($block, 1, -1), $declarations);
+            $declarations = preg_grep('/\A(?:--[\w-]+|(?i:color-scheme))\s*:/', array_map('trim', $declarations[1]));
+            if ($declarations !== []) {
+                $tokens[] = implode(', ', $selectors).' { '.implode('; ', $declarations).'; }';
+            }
+        }
+
+        return implode("\n", $tokens);
     }
 }
