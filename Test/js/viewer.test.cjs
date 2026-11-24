@@ -61,3 +61,69 @@ test('viewer replies immediately to the first ready from its own iframe and rela
         type: 'broadside:theme', nonce: 'accepted', theme: 'dark', preset: 'newburgh',
     });
 });
+
+test('viewer relays only its own iframe requests with the negotiated nonce', async () => {
+    const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
+    const messages = [];
+    const requests = [];
+    const frameWindow = { postMessage: (message) => messages.push({ ...message }) };
+    const href = 'https://kanboard.example/subdir/?controller=ArtifactController&action=show';
+    const frame = {
+        contentWindow: frameWindow,
+        dataset: {
+            submitUrl: '/subdir/?controller=BridgeController&action=submit&artifact_id=4',
+            resultsUrl: '/subdir/broadside/artifact/4/results',
+            version: '2',
+        },
+        closest: () => ({ dataset: { csrf: 'reusable-token' } }),
+    };
+    let listener;
+
+    vm.runInNewContext(script, {
+        document: {
+            documentElement: { classList: { contains: () => false } },
+            querySelector: () => frame,
+            baseURI: href,
+        },
+        window: {
+            addEventListener: (type, callback) => { listener = callback; },
+            fetch: async (url, options) => {
+                requests.push({ url: String(url), options });
+                return options.method === 'POST'
+                    ? { ok: true, json: async () => ({ id: 42 }) }
+                    : { ok: true, json: async () => ({ count: 1 }) };
+            },
+        },
+        MutationObserver: class { observe() {} },
+        URL,
+        URLSearchParams,
+    });
+
+    const nonce = 'frame-nonce';
+    listener({ source: frameWindow, data: { type: 'broadside:ready', nonce } });
+    messages.length = 0;
+
+    const submit = { type: 'broadside:submit', nonce, id: 1, formKey: 'poll', data: { choice: 'yes' }, opts: { once: true } };
+    const results = { type: 'broadside:results', nonce, id: 2, formKey: 'poll' };
+    listener({ source: {}, data: submit });
+    listener({ source: frameWindow, data: { ...results, nonce: 'wrong' } });
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 0);
+    assert.equal(messages.length, 0);
+
+    listener({ source: frameWindow, data: submit });
+    listener({ source: frameWindow, data: results });
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].url, 'https://kanboard.example/subdir/?controller=BridgeController&action=submit&artifact_id=4');
+    assert.equal(requests[0].options.method, 'POST');
+    assert.deepEqual(Object.fromEntries(requests[0].options.body), {
+        csrf_token: 'reusable-token', version: '2', form_key: 'poll', payload: '{"choice":"yes"}', once: '1',
+    });
+    assert.equal(requests[1].url, 'https://kanboard.example/subdir/broadside/artifact/4/results?form_key=poll');
+    assert.equal(requests[1].options.method, 'GET');
+    assert.deepEqual(messages, [
+        { type: 'broadside:response', nonce, id: 1, result: { id: 42 } },
+        { type: 'broadside:response', nonce, id: 2, result: { count: 1 } },
+    ]);
+});

@@ -15,6 +15,8 @@ class Plugin extends Base
         $this->route->addRoute('broadside/raw/:artifact_id/:version', 'RawController', 'show', 'Broadside');
         $this->route->addRoute('broadside/project/:project_id', 'ArtifactController', 'index', 'Broadside');
         $this->route->addRoute('broadside/artifact/:artifact_id', 'ArtifactController', 'show', 'Broadside');
+        $this->route->addRoute('broadside/artifact/:artifact_id/submit', 'BridgeController', 'submit', 'Broadside');
+        $this->route->addRoute('broadside/artifact/:artifact_id/results', 'BridgeController', 'results', 'Broadside');
 
         $access = new Access($this->container);
         $canView = fn (int $projectId): bool => $access->can((int) $this->userSession->getId(), $projectId, 'view');

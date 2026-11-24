@@ -36,12 +36,48 @@
         frame.contentWindow.postMessage({ type: 'broadside:theme', nonce, theme, preset }, '*');
     }
 
+    async function relayRequest(message) {
+        const reply = { type: 'broadside:response', nonce, id: message.id };
+        try {
+            const submit = message.type === 'broadside:submit';
+            const url = new URL(submit ? frame.dataset.submitUrl : frame.dataset.resultsUrl, document.baseURI);
+            const options = { method: submit ? 'POST' : 'GET', mode: 'same-origin' };
+            if (submit) {
+                options.body = new URLSearchParams({
+                    csrf_token: frame.closest('.broadside-viewer').dataset.csrf,
+                    version: frame.dataset.version,
+                    form_key: message.formKey,
+                    payload: JSON.stringify(message.data),
+                    once: message.opts?.once === true ? '1' : '0',
+                });
+            } else {
+                url.searchParams.set('form_key', message.formKey);
+            }
+            const response = await window.fetch(url, options);
+            const body = await response.json();
+            if (response.ok) {
+                reply.result = body;
+            } else {
+                reply.error = body.message || 'Broadside request failed.';
+            }
+        } catch {
+            reply.error = 'Broadside request failed.';
+        }
+        frame.contentWindow.postMessage(reply, '*');
+    }
+
     window.addEventListener('message', (event) => {
         const message = event.data;
         if (frame) {
-            if (event.source === frame.contentWindow && message?.nonce === nonce
-                && message.type === 'broadside:selection' && typeof message.text === 'string') {
+            if (event.source !== frame.contentWindow || message?.nonce !== nonce) {
+                return;
+            }
+            if (message.type === 'broadside:selection' && typeof message.text === 'string') {
                 relaySelection(message.text);
+            }
+            if ((message.type === 'broadside:submit' || message.type === 'broadside:results')
+                && Number.isSafeInteger(message.id) && typeof message.formKey === 'string') {
+                relayRequest(message);
             }
             return;
         }

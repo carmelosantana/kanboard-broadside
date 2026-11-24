@@ -26,5 +26,8 @@ $versionSeparator = str_contains($viewerUrl, '?') ? '&' : '?';
     <iframe class="broadside-frame" id="broadside-frame"
             sandbox="allow-scripts allow-popups allow-forms allow-modals"
             src="<?= $this->text->e($rawUrl) ?>" title="<?= $this->text->e($artifact['title']) ?>"
+            data-submit-url="<?= $this->text->e($this->url->to('BridgeController', 'submit', $artifactParams)) ?>"
+            data-results-url="<?= $this->text->e($this->url->to('BridgeController', 'results', $artifactParams)) ?>"
+            data-version="<?= $this->text->e($version) ?>"
             data-theme="<?= $this->text->e($theme) ?>" data-preset="<?= $this->text->e($preset) ?>"></iframe>
 </div>

@@ -7,6 +7,7 @@ use JsonRPC\Exception\AccessDeniedException;
 use Kanboard\Core\Base;
 use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\CommentModel;
+use Kanboard\Plugin\Broadside\Model\SubmissionModel;
 use Pimple\Container;
 
 final class BroadsideProcedure
@@ -46,6 +47,11 @@ final class BroadsideProcedure
     public function artifactCommentCreate($artifact_id, $body, $parent_id = 0, $quote = ''): int
     {
         return $this->model->createComment($artifact_id, $body, $parent_id, $quote);
+    }
+
+    public function artifactSubmissionList($artifact_id, $form_key = '', $since_id = 0): array
+    {
+        return $this->model->listSubmissions($artifact_id, $form_key, $since_id);
     }
 
     public function artifactRemove($artifact_id): bool
@@ -162,6 +168,20 @@ final class BroadsideProcedureModel extends Base
         $parentId = $this->integerParam($parentId, 'parent_id', 0);
 
         return (new CommentModel($this->container))->create($artifactId, $userId, $body, $parentId, $quote);
+    }
+
+    public function listSubmissions(mixed $artifactId, mixed $formKey, mixed $sinceId): array
+    {
+        $userId = $this->requireUser();
+        $artifactId = $this->integerParam($artifactId, 'artifact_id', 1);
+        $artifact = $this->findArtifact($artifactId);
+        if (empty($artifact) || ! (new Access($this->container))->can($userId, (int) $artifact['project_id'], 'view')) {
+            throw new AccessDeniedException();
+        }
+
+        $sinceId = $this->integerParam($sinceId, 'since_id', 0);
+
+        return (new SubmissionModel($this->container))->listByArtifact($artifactId, $formKey, $sinceId);
     }
 
     public function remove(mixed $artifactId): bool
