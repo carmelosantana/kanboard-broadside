@@ -7,6 +7,7 @@ use InvalidArgumentException;
 use Kanboard\Core\Base;
 use LengthException;
 use OutOfBoundsException;
+use OverflowException;
 use PDO;
 use stdClass;
 use Throwable;
@@ -18,6 +19,7 @@ class SubmissionModel extends Base
 
     private const MAX_LIMIT = 500;
     private const MAX_PAYLOAD_BYTES = 64 * 1024;
+    private const MAX_PER_MINUTE = 10;
 
     public function create(int $artifactId, int $userId, mixed $version, mixed $formKey, mixed $payload, bool $once): int
     {
@@ -51,6 +53,11 @@ class SubmissionModel extends Base
             $available->execute([$artifactId, $version]);
             if ($available->fetchColumn() === false) {
                 throw new OutOfBoundsException('Artifact version is unavailable.');
+            }
+
+            if ($this->db->table('broadside_submissions')->eq('artifact_id', $artifactId)->eq('user_id', $userId)
+                ->gt('created_at', time() - 60)->count() >= self::MAX_PER_MINUTE) {
+                throw new OverflowException('Too many submissions. Try again in a minute.');
             }
 
             if ($once && $this->db->table('broadside_submissions')->eq('artifact_id', $artifactId)

@@ -90,6 +90,24 @@ class BridgeControllerTest extends Base
         $this->assertTrue($results['mine']);
     }
 
+    public function testLimitsEachViewerToTenSubmissionsPerArtifactPerMinute(): void
+    {
+        $this->container['db']->table('broadside_submissions')->insert([
+            'artifact_id' => $this->artifactId, 'version' => 1, 'form_key' => 'poll',
+            'user_id' => $this->users['viewer'], 'payload' => '{}', 'created_at' => time() - 61,
+        ]);
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertSame(201, $this->submit('viewer', ['form_key' => 'poll-'.$i])[0]);
+        }
+
+        [$status, $body] = $this->submit('viewer', ['form_key' => 'another']);
+        $this->assertSame(429, $status);
+        $this->assertSame('rate_limited', $body['error']);
+        $this->assertNotEmpty($body['message']);
+        $this->assertSame(201, $this->submit('member')[0]);
+        $this->assertSame(12, $this->container['db']->table('broadside_submissions')->count());
+    }
+
     public function testOutsiderAndWrongMethodsCannotSubmit(): void
     {
         $this->assertSame(404, $this->submit('outsider')[0]);

@@ -53,6 +53,7 @@ viewer presses, never on load, and keep one submit in flight at a time. Broadsid
 enforces `{once: true}` per request. A request with this option is rejected if
 the viewer already submitted to that form on the artifact. Requests that omit
 the option can still create multiple rows, so count distinct usernames in a poll.
+Each viewer can submit up to 10 times a minute per artifact.
 Form keys use 1–64 lowercase ASCII letters, digits, underscores or hyphens.
 Send a JSON object of up to 64 KiB as `data`.
 

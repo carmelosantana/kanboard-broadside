@@ -11,6 +11,7 @@ use Kanboard\Plugin\Broadside\Model\Access;
 use Kanboard\Plugin\Broadside\Model\SubmissionModel;
 use LengthException;
 use OutOfBoundsException;
+use OverflowException;
 
 class BridgeController extends BaseController
 {
@@ -60,6 +61,8 @@ class BridgeController extends BaseController
             $this->error(403, 'forbidden', 'You cannot do that here.');
         } catch (OutOfBoundsException $e) {
             $this->error(404, 'not_found', $e->getMessage());
+        } catch (OverflowException $e) {
+            $this->error(429, 'rate_limited', $e->getMessage());
         } catch (DomainException $e) {
             $this->error(409, 'conflict', $e->getMessage());
         } catch (LengthException $e) {
