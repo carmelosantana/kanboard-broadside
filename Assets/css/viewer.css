@@ -37,3 +37,29 @@
     outline-offset: -1px;
     border-radius: var(--radius, 0.25rem);
 }
+
+.broadside-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border, currentColor);
+    border-radius: var(--radius, 0.25rem);
+}
+
+.broadside-confirm p {
+    flex-basis: 100%;
+    margin: 0;
+    font-weight: bold;
+}
+
+.broadside-confirm pre {
+    flex-basis: 100%;
+    max-height: 12rem;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

@@ -45,7 +45,11 @@ or `Inter` trigger a lint warning when listed directly.
 ## Submissions and results
 
 In the signed-in viewer, `broadside.submit(formKey, data, opts)` returns a promise
-for `{id}` and records a submission under the viewer's identity. Broadside
+for `{id}` and records a submission under the viewer's identity. The page above
+the artifact first asks "Send your response to <formKey>?" and shows `data`.
+Nothing is sent until the viewer confirms, and the promise rejects with
+`You cancelled the response.` if they cancel. Call `submit()` from a button the
+viewer presses, never on load, and keep one submit in flight at a time. Broadside
 enforces `{once: true}` per request. A request with this option is rejected if
 the viewer already submitted to that form on the artifact. Requests that omit
 the option can still create multiple rows, so count distinct usernames in a poll.

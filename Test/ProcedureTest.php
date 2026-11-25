@@ -155,6 +155,7 @@ class ProcedureTest extends Base
         $this->assertSame(file_get_contents(__DIR__.'/../CONTRACT.md'), $contract);
         $this->assertStringContainsString('var(--primary)', $contract);
         $this->assertStringContainsString('broadside.submit', $contract);
+        $this->assertStringContainsString('the viewer confirms', $contract);
     }
 
     public function testProcedureModelHasItsOwnAutoloadableClassFile(): void
