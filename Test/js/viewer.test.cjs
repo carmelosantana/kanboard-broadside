@@ -322,3 +322,20 @@ test('viewer rejects a submission the viewer cancels', async () => {
     assert.equal(button('Cancel'), null);
     assert.deepEqual(messages, [{ type: 'broadside:response', nonce, id: 7, error: 'You cancelled the response.' }]);
 });
+
+test('viewer answers circular submit data with an error and accepts the next submission', async () => {
+    const { listener, frameWindow, nonce, messages, requests, viewer } = relayHarness();
+    const circular = { name: 'loop' };
+    circular.self = circular;
+    listener({ source: frameWindow, data: { type: 'broadside:submit', nonce, id: 1, formKey: 'poll', data: circular } });
+    await new Promise(setImmediate);
+
+    assert.equal(requests.length, 0);
+    assert.deepEqual(messages, [{ type: 'broadside:response', nonce, id: 1, error: 'Broadside request failed.' }]);
+    messages.length = 0;
+
+    listener({ source: frameWindow, data: { type: 'broadside:submit', nonce, id: 2, formKey: 'poll', data: { a: 1 } } });
+    await new Promise(setImmediate);
+    assert.equal(messages.length, 0, 'the next submission is not rejected as already waiting');
+    assert.match(viewer.text, /Send your response to poll\?/);
+});

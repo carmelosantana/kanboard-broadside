@@ -11,3 +11,4 @@
 - **Comments.** Threaded comments per version can quote selected text. `artifactCommentList(project_id, since_id)` is a stable cursor for agents and the chat poller.
 - **Share links.** A manager can mint and revoke a read-only public link.
 - **Import.** A page that already follows the contract imports as-is. Other content is rewritten onto the contract through AiConnector when it is installed, and otherwise published as-is with lint warnings.
+- **Security.** A submission with circular data now gets an error reply instead of leaving the viewer unable to confirm any later submission until reload.

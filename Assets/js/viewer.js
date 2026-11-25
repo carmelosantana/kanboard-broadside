@@ -87,8 +87,17 @@
                 return;
             }
             confirming = true;
-            const confirmed = await confirmSubmit(message);
-            confirming = false;
+            let confirmed;
+            try {
+                confirmed = await confirmSubmit(message);
+            } catch {
+                // Unserialisable data (e.g. circular) must not wedge later submits.
+                reply.error = 'Broadside request failed.';
+                frame.contentWindow.postMessage(reply, '*');
+                return;
+            } finally {
+                confirming = false;
+            }
             if (!confirmed) {
                 reply.error = 'You cancelled the response.';
                 frame.contentWindow.postMessage(reply, '*');
