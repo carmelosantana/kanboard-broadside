@@ -17,7 +17,8 @@
         }
         return new Promise((resolve, reject) => {
             const id = ++nextId;
-            const timeout = window.setTimeout(() => {
+            // A submit waits for the viewer to confirm it, which takes as long as it takes.
+            const timeout = type === 'broadside:submit' ? undefined : window.setTimeout(() => {
                 pending.delete(id);
                 reject(new Error('Broadside viewer did not respond.'));
             }, 15000);

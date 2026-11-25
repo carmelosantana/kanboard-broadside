@@ -115,3 +115,28 @@ test('frame bridge posts the document height on load and when the root resizes',
         [{ type: 'broadside:height', nonce, height: 640 }, origin],
     ]);
 });
+
+test('frame bridge waits for the viewer to confirm a submit but times out results', async () => {
+    const script = readFileSync(require.resolve('../../Assets/js/frame-bridge.js'), 'utf8');
+    const timers = [];
+    const parent = { postMessage() {} };
+    const window = {
+        location: { origin: 'https://kanboard.example' },
+        parent,
+        addEventListener() {},
+        setTimeout: (callback) => timers.push(callback),
+        clearTimeout() {},
+    };
+    vm.runInNewContext(script, {
+        document: { currentScript: { dataset: { nonce: 'n' } }, documentElement: {}, addEventListener() {} },
+        window,
+        ResizeObserver: class { observe() {} },
+    });
+
+    let submitSettled = false;
+    window.broadside.submit('poll', { choice: 'a' }).then(() => { submitSettled = true; }, () => { submitSettled = true; });
+    const results = window.broadside.results('poll');
+    timers.splice(0).forEach((callback) => callback());
+    await assert.rejects(results, { message: 'Broadside viewer did not respond.' });
+    assert.equal(submitSettled, false, 'a submit stays pending while the viewer decides');
+});
