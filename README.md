@@ -34,7 +34,7 @@ Artifact HTML is untrusted.
 
 ## Development
 
-Tests run from the `kanboard-plugins` harness: `../testing/run-plugin-tests.sh Broadside` for PHPUnit, then `node --test Test/js/*.test.cjs`. The isolated end-to-end Kanboard and the demos are in `Test/e2e/` and `docs/demos/`.
+Tests run from the `kanboard-plugins` harness: `../testing/run-plugin-tests.sh Broadside` for PHPUnit, then `node --test Test/js/*.test.cjs`. The isolated end-to-end Kanboard and its demo scripts are in `Test/e2e/`.
 
 ## License
 
