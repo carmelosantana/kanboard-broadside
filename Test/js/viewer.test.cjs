@@ -132,12 +132,72 @@ test('viewer hides the quote control on deselection and keeps a quote already co
     assert.equal(quote.value, 'Release notes');
 });
 
-test('viewer relays only its own iframe requests with the negotiated nonce', async () => {
+class FakeElement {
+    constructor(tag) {
+        this.tagName = tag.toUpperCase();
+        this.children = [];
+        this.listeners = {};
+        this.attributes = {};
+        this.textContent = '';
+        this.className = '';
+        this.parent = null;
+    }
+
+    set innerHTML(value) {
+        throw new Error('viewer must not use innerHTML');
+    }
+
+    append(...nodes) {
+        for (const node of nodes) {
+            node.parent = this;
+            this.children.push(node);
+        }
+    }
+
+    setAttribute(name, value) {
+        this.attributes[name] = String(value);
+    }
+
+    addEventListener(type, callback) {
+        this.listeners[type] = callback;
+    }
+
+    focus() {}
+
+    remove() {
+        if (this.parent) {
+            this.parent.children = this.parent.children.filter((child) => child !== this);
+            this.parent = null;
+        }
+    }
+
+    get text() {
+        return this.textContent + this.children.map((child) => child.text).join('');
+    }
+
+    find(predicate) {
+        if (predicate(this)) {
+            return this;
+        }
+        for (const child of this.children) {
+            const found = child.find(predicate);
+            if (found) {
+                return found;
+            }
+        }
+        return null;
+    }
+}
+
+function relayHarness() {
     const script = readFileSync(require.resolve('../../Assets/js/viewer.js'), 'utf8');
     const messages = [];
     const requests = [];
+    const timers = [];
     const frameWindow = { postMessage: (message) => messages.push({ ...message }) };
     const href = 'https://kanboard.example/subdir/?controller=ArtifactController&action=show';
+    const viewer = new FakeElement('div');
+    viewer.dataset = { csrf: 'reusable-token' };
     const frame = {
         contentWindow: frameWindow,
         dataset: {
@@ -145,7 +205,8 @@ test('viewer relays only its own iframe requests with the negotiated nonce', asy
             resultsUrl: '/subdir/broadside/artifact/4/results',
             version: '2',
         },
-        closest: () => ({ dataset: { csrf: 'reusable-token' } }),
+        closest: () => viewer,
+        before: (node) => viewer.append(node),
     };
     let listener;
 
@@ -153,10 +214,12 @@ test('viewer relays only its own iframe requests with the negotiated nonce', asy
         document: {
             documentElement: { classList: { contains: () => false } },
             querySelector: () => frame,
+            createElement: (tag) => new FakeElement(tag),
             baseURI: href,
         },
         window: {
             addEventListener: (type, callback) => { listener = callback; },
+            setTimeout: (callback) => timers.push(callback),
             fetch: async (url, options) => {
                 requests.push({ url: String(url), options });
                 return options.method === 'POST'
@@ -173,6 +236,16 @@ test('viewer relays only its own iframe requests with the negotiated nonce', asy
     listener({ source: frameWindow, data: { type: 'broadside:ready', nonce } });
     messages.length = 0;
 
+    const button = (label) => viewer.find((node) => node.tagName === 'BUTTON' && node.textContent === label);
+    const click = (label, isTrusted = true) => button(label).listeners.click({ isTrusted });
+    const armTimers = () => timers.splice(0).forEach((callback) => callback());
+
+    return { listener, frameWindow, nonce, messages, requests, viewer, button, click, armTimers };
+}
+
+test('viewer relays only its own iframe requests with the negotiated nonce', async () => {
+    const { listener, frameWindow, nonce, messages, requests, click, armTimers } = relayHarness();
+
     const submit = { type: 'broadside:submit', nonce, id: 1, formKey: 'poll', data: { choice: 'yes' }, opts: { once: true } };
     const results = { type: 'broadside:results', nonce, id: 2, formKey: 'poll' };
     listener({ source: {}, data: submit });
@@ -184,16 +257,68 @@ test('viewer relays only its own iframe requests with the negotiated nonce', asy
     listener({ source: frameWindow, data: submit });
     listener({ source: frameWindow, data: results });
     await new Promise(setImmediate);
+    armTimers();
+    click('Send');
+    await new Promise(setImmediate);
     assert.equal(requests.length, 2);
-    assert.equal(requests[0].url, 'https://kanboard.example/subdir/?controller=BridgeController&action=submit&artifact_id=4');
-    assert.equal(requests[0].options.method, 'POST');
-    assert.deepEqual(Object.fromEntries(requests[0].options.body), {
+    assert.equal(requests[1].url, 'https://kanboard.example/subdir/?controller=BridgeController&action=submit&artifact_id=4');
+    assert.equal(requests[1].options.method, 'POST');
+    assert.deepEqual(Object.fromEntries(requests[1].options.body), {
         csrf_token: 'reusable-token', version: '2', form_key: 'poll', payload: '{"choice":"yes"}', once: '1',
     });
-    assert.equal(requests[1].url, 'https://kanboard.example/subdir/broadside/artifact/4/results?form_key=poll');
-    assert.equal(requests[1].options.method, 'GET');
+    assert.equal(requests[0].url, 'https://kanboard.example/subdir/broadside/artifact/4/results?form_key=poll');
+    assert.equal(requests[0].options.method, 'GET');
     assert.deepEqual(messages, [
-        { type: 'broadside:response', nonce, id: 1, result: { id: 42 } },
         { type: 'broadside:response', nonce, id: 2, result: { count: 1 } },
+        { type: 'broadside:response', nonce, id: 1, result: { id: 42 } },
     ]);
+});
+
+test('viewer asks the viewer to confirm a submission before posting it', async () => {
+    const { listener, frameWindow, nonce, messages, requests, viewer, button, click, armTimers } = relayHarness();
+    const data = { choice: '<img src=x onerror=alert(1)>' };
+    listener({ source: frameWindow, data: { type: 'broadside:submit', nonce, id: 1, formKey: 'poll', data } });
+    await new Promise(setImmediate);
+
+    assert.equal(requests.length, 0, 'nothing is posted before the viewer confirms');
+    assert.equal(messages.length, 0);
+    assert.match(viewer.text, /Send your response to poll\?/);
+    assert.ok(viewer.text.includes(JSON.stringify(data, null, 2)), 'the confirmation shows the data as text');
+
+    click('Send');
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 0, 'the Send button starts disarmed');
+
+    armTimers();
+    click('Send', false);
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 0, 'synthetic clicks do not confirm');
+
+    listener({ source: frameWindow, data: { type: 'broadside:submit', nonce, id: 2, formKey: 'poll', data } });
+    await new Promise(setImmediate);
+    assert.deepEqual(messages, [
+        { type: 'broadside:response', nonce, id: 2, error: 'Another response is waiting for confirmation.' },
+    ]);
+    messages.length = 0;
+
+    click('Send');
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].options.method, 'POST');
+    assert.equal(button('Send'), null, 'the confirmation closes');
+    assert.deepEqual(messages, [{ type: 'broadside:response', nonce, id: 1, result: { id: 42 } }]);
+});
+
+test('viewer rejects a submission the viewer cancels', async () => {
+    const { listener, frameWindow, nonce, messages, requests, button, click } = relayHarness();
+    listener({ source: frameWindow, data: { type: 'broadside:submit', nonce, id: 7, formKey: 'poll', data: { a: 1 } } });
+    await new Promise(setImmediate);
+
+    click('Cancel', false);
+    assert.notEqual(button('Cancel'), null, 'synthetic clicks do not cancel either');
+    click('Cancel');
+    await new Promise(setImmediate);
+    assert.equal(requests.length, 0);
+    assert.equal(button('Cancel'), null);
+    assert.deepEqual(messages, [{ type: 'broadside:response', nonce, id: 7, error: 'You cancelled the response.' }]);
 });

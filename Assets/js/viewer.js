@@ -4,6 +4,7 @@
     const root = document.documentElement;
     let frame;
     let nonce;
+    let confirming = false;
 
     function relaySelection(text) {
         const quote = document.querySelector('#broadside-comment-quote');
@@ -39,10 +40,62 @@
         frame.contentWindow.postMessage({ type: 'broadside:theme', nonce, theme, preset }, '*');
     }
 
+    // Frame script can post a submit at any time, so only a trusted click in this page sends it.
+    function confirmSubmit(message) {
+        return new Promise((resolve) => {
+            const panel = document.createElement('div');
+            panel.className = 'broadside-confirm';
+            panel.setAttribute('role', 'alertdialog');
+            const question = document.createElement('p');
+            question.textContent = 'Send your response to ' + message.formKey + '?';
+            const summary = document.createElement('pre');
+            const json = JSON.stringify(message.data, null, 2) ?? '';
+            summary.textContent = json.length > 2000 ? json.slice(0, 2000) + '\n…' : json;
+            const send = document.createElement('button');
+            send.type = 'button';
+            send.className = 'btn btn-blue';
+            send.textContent = 'Send';
+            // Arm after a pause so a click already aimed at the frame cannot land on Send.
+            send.disabled = true;
+            window.setTimeout(() => { send.disabled = false; }, 500);
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'btn';
+            cancel.textContent = 'Cancel';
+            const answer = (confirmed) => (event) => {
+                if (!event.isTrusted || (confirmed && send.disabled)) {
+                    return;
+                }
+                panel.remove();
+                resolve(confirmed);
+            };
+            send.addEventListener('click', answer(true));
+            cancel.addEventListener('click', answer(false));
+            panel.append(question, summary, send, cancel);
+            frame.before(panel);
+            cancel.focus();
+        });
+    }
+
     async function relayRequest(message) {
         const reply = { type: 'broadside:response', nonce, id: message.id };
+        const submit = message.type === 'broadside:submit';
+        if (submit) {
+            if (confirming) {
+                reply.error = 'Another response is waiting for confirmation.';
+                frame.contentWindow.postMessage(reply, '*');
+                return;
+            }
+            confirming = true;
+            const confirmed = await confirmSubmit(message);
+            confirming = false;
+            if (!confirmed) {
+                reply.error = 'You cancelled the response.';
+                frame.contentWindow.postMessage(reply, '*');
+                return;
+            }
+        }
         try {
-            const submit = message.type === 'broadside:submit';
             const url = new URL(submit ? frame.dataset.submitUrl : frame.dataset.resultsUrl, document.baseURI);
             const options = { method: submit ? 'POST' : 'GET', mode: 'same-origin' };
             if (submit) {
