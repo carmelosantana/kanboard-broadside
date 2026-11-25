@@ -1,0 +1,17 @@
+# Isolated Kanboard for Broadside demos. Never the shared kb-suite.
+# Paths are relative to this file. Overrides:
+#   BROADSIDE_SRC  Broadside checkout to mount (default: ../.., this repo)
+#   HARBOR_SRC     Harbor checkout to mount (default: ../../../Harbor, a sibling of this repo)
+name: kb-broadside
+services:
+  kanboard:
+    image: kanboard/kanboard:v1.2.47
+    container_name: kb-broadside
+    ports:
+      - "127.0.0.1:8097:80"
+    volumes:
+      - ${BROADSIDE_SRC:-../..}:/var/www/app/plugins/Broadside:ro
+      - ${HARBOR_SRC:-../../../Harbor}:/var/www/app/plugins/Harbor:ro
+      - kb-broadside-data:/var/www/app/data
+volumes:
+  kb-broadside-data:

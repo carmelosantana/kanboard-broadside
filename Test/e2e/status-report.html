@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Broadside demo: status report</title>
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-4); }
+    .stat { font-size: 2rem; font-weight: 600; color: var(--primary); margin: 0; }
+    .label { color: var(--muted-foreground); margin: 0; }
+    .poll { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="bs-doc">
+    <h1>Broadside v1: build status</h1>
+    <p>Published by an agent through the kanboard-mcp <code>artifact</code> tool. Everything on this page uses the Harbor tokens, so it follows your light or dark theme.</p>
+    <div class="grid">
+      <section class="card"><p class="stat">10 / 14</p><p class="label">plan tasks built</p></section>
+      <section class="card"><p class="stat">62</p><p class="label">PHPUnit tests passing</p></section>
+      <section class="card"><p class="stat">5</p><p class="label">security reviews approved</p></section>
+    </div>
+    <h2>What to look at next?</h2>
+    <div class="poll">
+      <button type="button" data-choice="import">Import path</button>
+      <button type="button" data-choice="comments">Comment delivery</button>
+      <button type="button" data-choice="sharing">Share links</button>
+    </div>
+    <p id="tally" role="status"></p>
+    <h2>Decisions</h2>
+    <table>
+      <thead><tr><th>#</th><th>Decision</th></tr></thead>
+      <tbody>
+        <tr><td>D3</td><td>Sandboxed iframe plus a sandbox CSP header, same host</td></tr>
+        <tr><td>D4</td><td>Harbor tokens and base styles injected on serve</td></tr>
+        <tr><td>D5</td><td>Polls and forms through the parent-page bridge</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <script>
+    const tally = document.querySelector('#tally');
+    const names = { import: 'Import path', comments: 'Comment delivery', sharing: 'Share links' };
+    async function refresh() {
+      const { rows } = await broadside.results('next_focus');
+      const counts = {};
+      for (const { username, data } of rows) counts[data.choice] = (counts[data.choice] || new Set()).add(username);
+      tally.textContent = Object.keys(names).map(k => `${names[k]}: ${counts[k] ? counts[k].size : 0}`).join(' · ');
+    }
+    const showError = e => { tally.textContent = e.message; };
+    for (const b of document.querySelectorAll('button[data-choice]')) {
+      b.addEventListener('click', async () => {
+        try { await broadside.submit('next_focus', { choice: b.dataset.choice }, { once: true }); await refresh(); }
+        catch (e) { showError(e); }
+      });
+    }
+    refresh().catch(showError);
+  </script>
+</body>
+</html>
