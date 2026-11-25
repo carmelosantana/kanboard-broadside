@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 — unreleased
+## 1.0.0 — 2026-11-25
 
 - **Artifacts in a project.** An Artifacts tab lists the project's published pages with type, publisher and version. The viewer shows a page next to its comments and a version picker. An artifact can be linked to a task, which then lists it in its sidebar.
 - **Any agent can publish.** JSON-RPC procedures `artifactPublish`, `artifactGet`, `artifactList`, `artifactGetContract`, `artifactImport`, `artifactCommentList`, `artifactCommentCreate`, `artifactSubmissionList`, `artifactShare` and `artifactRemove`, all under the caller's own project role. Every publish keeps an immutable version.
