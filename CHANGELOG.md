@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — Unreleased
+## 1.1.0 — 2026-11-27
 
 - **Model routing.** Import rewriting uses AiConnector 1.4.0 model routing as the `broadside.rewrite` feature ("Rewrite imports"): the admin or project profile decides the model, and the rewrite is skipped when none is available. Requires AiConnector 1.4.0 for AI rewriting.
 
