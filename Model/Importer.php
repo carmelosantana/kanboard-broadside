@@ -35,7 +35,7 @@ final class Importer extends Base
         $warnings = $format === 'html' ? Lint::check($content) : [];
         $rewritten = false;
         $aiError = [];
-        if ($warnings !== [] && ($rewriter = $this->readyRewriter()) !== null) {
+        if ($warnings !== [] && ($rewriter = $this->readyRewriter($projectId)) !== null) {
             try {
                 $result = $rewriter->structured([
                     [
@@ -44,7 +44,7 @@ final class Importer extends Base
                             .file_get_contents(__DIR__.'/../CONTRACT.md'),
                     ],
                     ['role' => 'user', 'content' => $content],
-                ], '{"type":"object","properties":{"html":{"type":"string"}},"required":["html"],"additionalProperties":false}');
+                ], '{"type":"object","properties":{"html":{"type":"string"}},"required":["html"],"additionalProperties":false}', $projectId);
                 $html = $result['html'] ?? null;
                 if (! is_string($html) || strlen($html) > self::MAX_CONTENT_BYTES) {
                     throw new InvalidArgumentException('AI rewrite must return HTML of at most 5 MiB.');
@@ -66,10 +66,10 @@ final class Importer extends Base
         ]) + ['warnings' => $warnings, 'rewritten' => $rewritten] + $aiError;
     }
 
-    private function readyRewriter(): ?AiRewriter
+    private function readyRewriter(int $projectId): ?AiRewriter
     {
         $rewriter = $this->rewriter ?? AiConnectorRewriter::fromInstalledPlugin($this->container);
 
-        return $rewriter?->isReady() ? $rewriter : null;
+        return $rewriter?->isReady($projectId) ? $rewriter : null;
     }
 }

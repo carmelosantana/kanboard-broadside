@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 — Unreleased
+
+- **Model routing.** Import rewriting uses AiConnector 1.4.0 model routing as the `broadside.rewrite` feature ("Rewrite imports"): the admin or project profile decides the model, and the rewrite is skipped when none is available. Requires AiConnector 1.4.0 for AI rewriting.
+
 ## 1.0.0 — 2026-11-25
 
 - **Artifacts in a project.** An Artifacts tab lists the project's published pages with type, publisher and version. The viewer shows a page next to its comments and a version picker. An artifact can be linked to a task, which then lists it in its sidebar.

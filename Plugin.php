@@ -6,6 +6,7 @@ use Kanboard\Core\Plugin\Base;
 use Kanboard\Core\Security\Role;
 use Kanboard\Plugin\Broadside\Api\BroadsideProcedure;
 use Kanboard\Plugin\Broadside\Model\Access;
+use Kanboard\Plugin\Broadside\Model\AiConnectorRewriter;
 use Kanboard\Plugin\Broadside\Model\ArtifactModel;
 
 class Plugin extends Base
@@ -20,6 +21,10 @@ class Plugin extends Base
         $this->route->addRoute('broadside/artifact/:artifact_id/results', 'BridgeController', 'results', 'Broadside');
         $this->route->addRoute('broadside/s/:token', 'ShareController', 'show', 'Broadside');
         $this->applicationAccessMap->add('ShareController', 'show', Role::APP_PUBLIC);
+
+        $this->hook->on('aiconnector:features', static fn (): array => [
+            ['id' => AiConnectorRewriter::FEATURE, 'label' => t('Rewrite imports'), 'plugin' => 'Broadside'],
+        ]);
 
         $access = new Access($this->container);
         $canView = fn (int $projectId): bool => $access->can((int) $this->userSession->getId(), $projectId, 'view');
@@ -58,7 +63,7 @@ class Plugin extends Base
 
     public function getPluginVersion(): string
     {
-        return '1.0.0';
+        return '1.1.0';
     }
 
     public function getPluginAuthor(): string

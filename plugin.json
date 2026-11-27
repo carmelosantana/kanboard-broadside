@@ -1,7 +1,7 @@
 {
     "name": "Broadside",
     "description": "Publish project artifacts as sandboxed HTML or Markdown pages.",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Carmelo Santana",
     "homepage": "https://github.com/carmelosantana/kanboard-broadside",
     "license": "MIT",
@@ -15,7 +15,7 @@
         },
         {
             "plugin": "AiConnector",
-            "min_version": "1.2.0",
+            "min_version": "1.4.0",
             "reason": "rewrites non-conforming imports onto the contract"
         }
     ]

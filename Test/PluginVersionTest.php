@@ -9,7 +9,7 @@ class PluginVersionTest extends Base
     {
         $plugin = new Plugin($this->container);
         $manifest = json_decode(file_get_contents(__DIR__.'/../plugin.json'), false, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame('1.0.0', $plugin->getPluginVersion());
+        $this->assertSame('1.1.0', $plugin->getPluginVersion());
         $this->assertSame($plugin->getPluginVersion(), $manifest->version);
 
         $this->assertIsArray($manifest->recommends);
@@ -22,6 +22,6 @@ class PluginVersionTest extends Base
             $this->assertArrayNotHasKey($recommendation->plugin, $versions);
             $versions[$recommendation->plugin] = $recommendation->min_version;
         }
-        $this->assertEquals(['Harbor' => '2.0.0', 'AiConnector' => '1.2.0'], $versions);
+        $this->assertEquals(['Harbor' => '2.0.0', 'AiConnector' => '1.4.0'], $versions);
     }
 }
